@@ -31,10 +31,10 @@ jobs:
         run: |
           sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
 
-      - name: 🚀 Update Containers & Storage Cleanup
+      - name: 🚀 Update Containers & Fix LogManager
         run: |
-          # 1. Create temporary .env to bypass sudo environment restrictions
-          printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\n" > .env
+          # 1. Create temporary .env with secrets and JBoss LogManager fix
+          printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\nJAVA_OPTS=-Djava.util.logging.manager=org.jboss.logmanager.LogManager\n" > .env
           
           # 2. Deploy and build
           sudo /usr/bin/docker compose up -d --build --force-recreate
