@@ -1,13 +1,24 @@
 services:
   hoa-app:
+    # Stable Java 21 image
     image: eclipse-temurin:21-jre-jammy
     container_name: hoa-quarkus-app
+    # CRITICAL: This maps your code into the container
     volumes:
-      # Map the whole target folder
-      - ./target:/deployments:z
+      - ./target/quarkus-app:/deployments:z
     working_dir: /deployments
-    # Update this to match your actual jar name (check target/ after build)
-    command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar hoa-generic-1.0.0-SNAPSHOT-runner.jar
+    environment:
+      - JAVA_OPTS=-Djava.util.logging.manager=org.jboss.logmanager.LogManager
+    # Execute the runner jar explicitly
+    command: java -jar /deployments/quarkus-run.jar
     ports:
       - "8081:8080"
+    restart: always
+
+  # This service pulls the image, it does not "build" anything locally
+  hoa-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: hoa-cloudflared
+    # Routes traffic from the tunnel to the app service above
+    command: tunnel --url http://hoa-quarkus-app:8080
     restart: always
