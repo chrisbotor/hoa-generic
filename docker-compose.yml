@@ -24,10 +24,11 @@ services:
     container_name: hoa-cloudflared
     image: cloudflare/cloudflared:latest
     restart: always
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN}
-    command: tunnel --no-autoupdate run
-    depends_on:
+    #environment:
+    #  - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN}
+    #command: tunnel --no-autoupdate run
+    command: tunnel --no-autoupdate --url http://hoa-web:80 
+   depends_on:
       - hoa-quarkus-app
     networks:
       - hoa-network
