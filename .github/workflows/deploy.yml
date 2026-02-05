@@ -23,5 +23,6 @@ jobs:
           HASURA_URL: ${{ secrets.HASURA_URL }}
         run: |
           docker compose down
+          docker image prune -f
           docker compose up -d --build
           docker system prune -f # Saves space on your 500GB NVMe
