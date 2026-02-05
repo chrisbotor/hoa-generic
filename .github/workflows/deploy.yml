@@ -2,7 +2,7 @@ name: HOA Portal Auto-Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -10,52 +10,50 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: 📥 Pull latest code
+      - name: 📂 Checkout Repository
         uses: actions/checkout@v4
 
       - name: 🧹 Pre-Build Cleanup
         run: |
-          sudo /usr/bin/rm -rf target/ || true
-          sudo /usr/bin/chown -R $USER:$USER .
-          find ~/.m2/repository -name "*.lock" -delete || true
+          # Ensure target folder is cleared and permissions are set for the runner
+          sudo rm -rf target/
+          sudo chown -R $USER:$USER .
+
+      - name: ☕ Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
 
       - name: 🔨 Build Quarkus App
-        run: mvn clean package -U -DskipTests
+        run: ./mvnw clean package -U -DskipTests
 
-      - name: 🛑 Docker Name Conflict Cleanup
+      - name: 🗑️ Name Conflict Cleanup
         run: |
+          # Forcefully remove old containers to clear naming conflicts
           sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
-          sudo /usr/bin/docker compose down --remove-orphans || true
 
-- name: 🚀 Update Containers
+      - name: 🚀 Update Containers
         run: |
-          # 1. Clear old containers to prevent name conflicts
-          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
-          
-          # 2. Create the .env file
-          # Ensure 'cat' is indented at least 10 spaces from the start of the file
+          # 1. Create the .env file using the absolute workspace path
+          # Indentation here is critical to avoid YAML parser errors
           cat <<EOF > $GITHUB_WORKSPACE/.env
           DB_USER=${{ secrets.DB_USER }}
           DB_PASS=${{ secrets.DB_PASS }}
           HASURA_URL=http://192.168.100.80:8080/v1/graphql
           HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}
           EOF
-          
-          # 3. Deploy using explicit pathing for the self-hosted runner
+
+          # 2. Deploy using the .env file and explicit pathing
           sudo /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
-          
-          # 4. Display the Quick Tunnel URL (optional but helpful)
-          sleep 5
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep "trycloudflare.com" || echo "Tunnel still starting..."
-          
-          # 5. Security cleanup
-          sudo /usr/bin/rm $GITHUB_WORKSPACE/.env      
-         
-      - name: 📉 Clean Up Storage
+
+          # 3. Security cleanup: remove the temporary .env file
+          sudo /usr/bin/rm $GITHUB_WORKSPACE/.env
+
+      - name: 🧹 Storage Cleanup
         run: sudo /usr/bin/docker image prune -f
 
-      - name: 🛡️ Post-Deployment Ownership Reset
+      - name: 🛡️ Post-Deployment Permissions
         if: always()
-        run: |
-          sudo /usr/bin/chown -R $USER:$USER .
-          sudo /usr/bin/rm -rf target/ || true
+        run: sudo chown -R $USER:$USER .
