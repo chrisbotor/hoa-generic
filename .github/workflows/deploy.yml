@@ -1,66 +1,35 @@
-name: HOA Portal Auto-Deploy
-
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
-
-jobs:
-  deploy:
-    runs-on: self-hosted
-
-    steps:
-      - name: 🛡️ Force Cleanup Permissions
-        # Fixes "EACCES: permission denied" during checkout
+- name: 🚀 Update Containers & Sync Config
         run: |
-          if [ -d "target" ]; then
-            sudo chown -R $USER:$USER target
-            sudo rm -rf target
-          fi
-
-      - name: 📂 Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: ☕ Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: 🔨 Build Quarkus App
-        run: ./mvnw clean package -U -DskipTests
-
-      - name: 🛡️ Fix Build Permissions for Docker
-        # Fixes "Unable to access jarfile" by letting Docker read the files
-        run: sudo chmod -R 777 target/
-
-      - name: 🗑️ Clear Container Conflicts
-        # Prevents "Conflict: Container name already in use"
-        run: |
-          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
-
-      - name: 🚀 Update Containers & Fix LogManager
-        run: |
-          # 1. Create .env with secrets and LogManager fix
+          # 1. Create .env with JBoss LogManager fix
           printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\nJAVA_OPTS=-Djava.util.logging.manager=org.jboss.logmanager.LogManager\n" > .env
           
-          # 2. Deploy
+          # 2. CREATE the docker-compose.yml dynamically to ensure path accuracy
+          cat << 'EOF' > docker-compose.yml
+          services:
+            hoa-app:
+              image: eclipse-temurin:21-jre-jammy
+              container_name: hoa-quarkus-app
+              volumes:
+                - ./target/quarkus-app:/deployments:z
+              working_dir: /deployments
+              environment:
+                - JAVA_OPTS=${JAVA_OPTS}
+              command: java ${JAVA_OPTS} -jar /deployments/quarkus-run.jar
+              ports:
+                - "8081:8080"
+              restart: always
+
+            hoa-tunnel:
+              image: cloudflare/cloudflared:latest
+              container_name: hoa-cloudflared
+              command: tunnel --url http://hoa-quarkus-app:8080
+              restart: always
+          EOF
+
+          # 3. Deploy using the freshly created files
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
-          # 3. Cleanup storage on Beelink
+          # 4. Cleanup storage
           rm .env
           sudo /usr/bin/docker image prune -f
           sudo rm -rf $GITHUB_WORKSPACE/target
-
-      - name: 🔗 Get Quick Tunnel URL
-        run: |
-          echo "Waiting 20 seconds for Cloudflare..."
-          sleep 20
-          echo "------------------------------------------------"
-          echo "ACCESS YOUR PORTAL AT THE LINK BELOW:"
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet."
-          echo "------------------------------------------------"
-
-      - name: 🛡️ Post-Deployment Ownership Reset
-        if: always()
-        run: sudo /usr/bin/chown -R $USER:$USER .
