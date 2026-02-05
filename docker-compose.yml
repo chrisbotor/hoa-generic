@@ -1,7 +1,11 @@
 services:
   hoa-app:
-    image: quay.io/quarkus/quarkus-dist-image:latest
+    image: eclipse-temurin:21-jre-jammy
     container_name: hoa-quarkus-app
+    volumes:
+      - ./target/quarkus-app:/deployments
+    working_dir: /deployments
+    command: java -jar quarkus-run.jar
     ports:
       - "8081:8080"
     restart: always
