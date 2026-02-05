@@ -1,28 +1,35 @@
-name: HOA Portal Deployment
+name: HOA Portal Auto-Deploy
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # <--- This adds the manual "Run workflow" button
+  # This adds the manual "Run workflow" button in the GitHub UI
+  workflow_dispatch:
 
 jobs:
   deploy:
-    runs-on: self-hosted # Forces the job to run on your Beelink runner
-
+    runs-on: self-hosted # Targets your Beelink runner
+    
     steps:
-      - name: 📥 Pull Code
+      - name: 📥 Pull latest code
         uses: actions/checkout@v4
 
-      - name: ☕ Build Java App
-        run: mvn package -U -DskipTests # Compiles the .jar file
+      - name: 🧹 Fix Maven Permissions & Locks
+        # Solves "part.lock" and "Failed to create parent directories" errors
+        run: |
+          find ~/.m2/repository -name "*.lock" -delete || true
+          sudo chown -R $USER:$USER ~/.m2
+
+      - name: 🔨 Build Quarkus App
+        # -U forces Maven to ignore broken local caches and download clean versions
+        run: mvn clean package -U -DskipTests
 
       - name: 🚀 Update Containers
-        env:
-          # Injects secrets into the deployment environment
-          HASURA_ADMIN_SECRET: ${{ secrets.HASURA_ADMIN_SECRET }}
-          HASURA_URL: ${{ secrets.HASURA_URL }}
+        # --force-recreate: Solves "Container name already in use" conflict
+        # --remove-orphans: Keeps the project clean of old deleted services
         run: |
-          docker compose down
-          docker image prune -f
-          docker compose up -d --build
-          docker system prune -f # Saves space on your 500GB NVMe
+          docker compose up -d --build --force-recreate --remove-orphans
+
+      - name: 📉 Clean Up Storage
+        # Essential for maintaining your 500GB NVMe drive
+        run: docker image prune -f
