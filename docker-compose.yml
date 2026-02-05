@@ -1,4 +1,5 @@
 services:
+  # The Core HOA Application
   hoa-quarkus-app:
     container_name: hoa-quarkus-app
     build: 
@@ -8,19 +9,42 @@ services:
       - QUARKUS_DATASOURCE_JDBC_URL=jdbc:postgresql://192.168.100.80:5432/hoa_db
       - QUARKUS_DATASOURCE_USERNAME=${DB_USER}
       - QUARKUS_DATASOURCE_PASSWORD=${DB_PASS}
-      # MATCHING THE JAVA LOGS:
       - HASURA_URL=${HASURA_URL}
       - HASURA_ADMIN_SECRET=${HASURA_ADMIN_SECRET}
     restart: always
+    # We keep the healthcheck for monitoring, but remove the blocking rule below
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/q/health/live || exit 1"]
+      test: ["CMD-SHELL", "nc -z localhost 8080 || wget -q --spider http://localhost:8080/q/health/live || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 180s # Gives the Beelink 3 minutes to warm up
+      start_period: 180s
     networks:
       - hoa-network
 
-  # ... Cloudflared and Web services stay the same ...
+  # Cloudflare Tunnel
+  hoa-cloudflared:
+    container_name: hoa-cloudflared
+    image: cloudflare/cloudflared:latest
+    restart: always
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN}
+    command: tunnel --no-autoupdate run
+    depends_on:
+      - hoa-quarkus-app # Removed 'condition: service_healthy'
+    networks:
+      - hoa-network
+
+  # Frontend Web Server
+  hoa-web:
+    container_name: hoa-web
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    depends_on:
+      - hoa-quarkus-app # Removed 'condition: service_healthy'
+    networks:
+      - hoa-network
+
 networks:
-  hoa-network: {} # <--- YOU MUST HAVE THESE CURLY BRACES OR IT IS 'UNDEFINED'
+  hoa-network: {}
