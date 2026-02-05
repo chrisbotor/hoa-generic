@@ -1,18 +1,58 @@
-name: HOA-Deploy
+name: HOA Portal Auto-Deploy
+
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: self-hosted
+
     steps:
-      - name: Checkout
+      - name: 📂 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build
-        run: ./mvnw clean package -DskipTests
+      - name: 🧹 Pre-Build Cleanup
+        run: |
+          sudo /usr/bin/rm -rf target/ || true
+          sudo /usr/bin/chown -R $USER:$USER .
 
-      - name: Deploy
-        run: sudo /usr/bin/docker compose up -d --build --force-recreate
+      - name: ☕ Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: 🔨 Build Quarkus App
+        run: ./mvnw clean package -U -DskipTests
+
+      - name: 🗑️ Name Conflict Cleanup
+        run: |
+          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
+
+      - name: 🚀 Update Containers & Storage Cleanup
+        run: |
+          # 1. Create temporary .env to bypass sudo environment restrictions
+          printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\n" > .env
+          
+          # 2. Deploy and build
+          sudo /usr/bin/docker compose up -d --build --force-recreate
+          
+          # 3. Securely remove the .env and prune old Docker images to save space on Beelink
+          rm .env
+          sudo /usr/bin/docker image prune -f
+          sudo rm -rf $GITHUB_WORKSPACE/target
+
+      - name: 🔗 Get Quick Tunnel URL
+        run: |
+          echo "Waiting 20 seconds for Cloudflare to assign a URL..."
+          sleep 20
+          echo "------------------------------------------------"
+          echo "ACCESS YOUR PORTAL AT THE LINK BELOW:"
+          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet. Check logs manually."
+          echo "------------------------------------------------"
+
+      - name: 🛡️ Post-Deployment Ownership Reset
+        if: always()
+        run: sudo /usr/bin/chown -R $USER:$USER .
