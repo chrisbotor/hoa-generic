@@ -1,43 +1,9 @@
-name: HOA Portal Auto-Deploy
-
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
-
-jobs:
-  deploy:
-    runs-on: self-hosted
-    steps:
-      - name: 🛡️ Force Cleanup Permissions
+- name: 🚀 Update Containers & Sync Config
         run: |
-          if [ -d "target" ]; then
-            sudo chown -R $USER:$USER target
-            sudo rm -rf target
-          fi
-
-      - name: 📂 Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: ☕ Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: 🔨 Build Quarkus App
-        run: ./mvnw clean package -U -DskipTests
-
-      - name: 🛡️ Fix Build Permissions for Docker
-        run: sudo chmod -R 777 target/
-
-      - name: 🗑️ Clear Container Conflicts
-        run: sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
-
-      - name: 🚀 Update Containers & Sync Config
-        run: |
-          printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\nJAVA_OPTS=-Djava.util.logging.manager=org.jboss.logmanager.LogManager\n" > .env
+          # 1. Create .env for sensitive database secrets
+          printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\n" > .env
           
+          # 2. Generate the docker-compose.yml with the LogManager HARDCODED
           cat << 'EOF' > docker-compose.yml
           services:
             hoa-app:
@@ -47,11 +13,14 @@ jobs:
                 - ./target/quarkus-app:/deployments:z
               working_dir: /deployments
               environment:
-                - JAVA_OPTS=${JAVA_OPTS}
-              command: java ${JAVA_OPTS} -jar /deployments/quarkus-run.jar
+                - DB_USER=${DB_USER}
+                - DB_PASS=${DB_PASS}
+              # We hardcode the LogManager here to ensure it NEVER fails to boot
+              command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar /deployments/quarkus-run.jar
               ports:
                 - "8081:8080"
               restart: always
+
             hoa-tunnel:
               image: cloudflare/cloudflared:latest
               container_name: hoa-cloudflared
@@ -59,16 +28,9 @@ jobs:
               restart: always
           EOF
 
+          # 3. Deploy
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
+          
+          # 4. Cleanup
           rm .env
           sudo /usr/bin/docker image prune -f
-
-      - name: 🔗 Get Quick Tunnel URL
-        run: |
-          echo "Waiting 20 seconds for Cloudflare..."
-          sleep 20
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet."
-
-      - name: 🛡️ Post-Deployment Ownership Reset
-        if: always()
-        run: sudo /usr/bin/chown -R $USER:$USER .
