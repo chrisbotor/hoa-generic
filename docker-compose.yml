@@ -3,17 +3,11 @@ services:
     image: eclipse-temurin:21-jre-jammy
     container_name: hoa-quarkus-app
     volumes:
-      # Map the directory using a bind mount with read permissions
-      - ./target/quarkus-app:/deployments:ro
+      # Map the whole target folder
+      - ./target:/deployments:z
     working_dir: /deployments
-    # Use the simplest command to start
-    command: ["java", "-jar", "quarkus-run.jar"]
+    # Update this to match your actual jar name (check target/ after build)
+    command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar hoa-generic-1.0.0-SNAPSHOT-runner.jar
     ports:
       - "8081:8080"
-    restart: always
-
-  hoa-tunnel:
-    image: cloudflare/cloudflared:latest
-    container_name: hoa-cloudflared
-    command: tunnel --url http://hoa-quarkus-app:8080
     restart: always
