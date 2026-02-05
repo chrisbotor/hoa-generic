@@ -34,13 +34,12 @@ jobs:
 
       - name: 🚀 Update Containers
         run: |
-          
-          cat <<EOF > $GITHUB_WORKSPACE/.env
-          DB_USER=${{ secrets.DB_USER }}
-          DB_PASS=${{ secrets.DB_PASS }}
-          HASURA_URL=http://192.168.100.80:8080/v1/graphql
-          HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}
-          EOF
+          # We pass the values directly to the command
+          DB_USER=hoa_admin \
+          DB_PASS=qwertyuiop \
+          HASURA_URL=http://192.168.100.80:8080/v1/graphql \
+          HASURA_ADMIN_SECRET=myadminsecretkey \
+          sudo -E /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE up -d --build --force-recreate
           
           # Deploy using the explicit .env file path
           sudo /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
