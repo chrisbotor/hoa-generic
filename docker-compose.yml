@@ -2,14 +2,14 @@ services:
   hoa-app:
     image: eclipse-temurin:21-jre-jammy
     container_name: hoa-quarkus-app
+    # Critical: Map the whole folder, not just the jar
     volumes:
-      # Maps your local target folder to the container's deployment folder
       - ./target/quarkus-app:/deployments:z
     working_dir: /deployments
     environment:
       - JAVA_OPTS=-Djava.util.logging.manager=org.jboss.logmanager.LogManager
-    # Execute the jar using the explicit path
-    command: java -jar /deployments/quarkus-run.jar
+    # Execute the jar using its relative path in the deployments folder
+    command: java -jar quarkus-run.jar
     ports:
       - "8081:8080"
     restart: always
