@@ -1,14 +1,18 @@
-name: HOA Portal Auto-Deploy
+name: HOA-Deploy
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+
 jobs:
   deploy:
     runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Build
         run: ./mvnw clean package -DskipTests
+
       - name: Deploy
         run: sudo /usr/bin/docker compose up -d --build --force-recreate
