@@ -3,33 +3,33 @@ name: HOA Portal Auto-Deploy
 on:
   push:
     branches: [ main ]
-  # This adds the manual "Run workflow" button in the GitHub UI
-  workflow_dispatch:
+  workflow_dispatch: # Allows you to trigger a deploy manually from the GitHub UI
 
 jobs:
   deploy:
-    runs-on: self-hosted # Targets your Beelink runner
-    
+    runs-on: self-hosted # Targets your Beelink SER5 Pro runner
+
     steps:
       - name: 📥 Pull latest code
         uses: actions/checkout@v4
 
       - name: 🧹 Fix Maven Permissions & Locks
-        # Solves "part.lock" and "Failed to create parent directories" errors
+        # Uses the NOPASSWD permission we set in /etc/sudoers.d/cbotor-github-runner
         run: |
           find ~/.m2/repository -name "*.lock" -delete || true
           sudo chown -R $USER:$USER ~/.m2
+          sudo chmod -R 755 ~/.m2
 
       - name: 🔨 Build Quarkus App
-        # -U forces Maven to ignore broken local caches and download clean versions
+        # -U forces Maven to update and fix any corrupted dependencies automatically
         run: mvn clean package -U -DskipTests
 
       - name: 🚀 Update Containers
-        # --force-recreate: Solves "Container name already in use" conflict
-        # --remove-orphans: Keeps the project clean of old deleted services
+        # --force-recreate ensures you never see the "Container name in use" error
+        # --remove-orphans keeps your Docker environment clean
         run: |
-          docker compose up -d --build --force-recreate --remove-orphans
+          sudo docker compose up -d --build --force-recreate --remove-orphans
 
       - name: 📉 Clean Up Storage
-        # Essential for maintaining your 500GB NVMe drive
-        run: docker image prune -f
+        # Essential for your 500GB NVMe to prevent disk bloat
+        run: sudo docker image prune -f
