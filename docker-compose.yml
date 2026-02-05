@@ -9,7 +9,7 @@ services:
     environment:
       - JAVA_OPTS=-Djava.util.logging.manager=org.jboss.logmanager.LogManager
     # Execute the jar using its relative path in the deployments folder
-    command: java -jar quarkus-run.jar
+    command: java -jar /deployments/quarkus-run.jar
     ports:
       - "8081:8080"
     restart: always
