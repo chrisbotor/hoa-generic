@@ -8,10 +8,8 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
-
     steps:
       - name: 🛡️ Force Cleanup Permissions
-        # Solves "EACCES: permission denied" by taking ownership of old root-owned files
         run: |
           if [ -d "target" ]; then
             sudo chown -R $USER:$USER target
@@ -31,20 +29,15 @@ jobs:
         run: ./mvnw clean package -U -DskipTests
 
       - name: 🛡️ Fix Build Permissions for Docker
-        # Solves "Unable to access jarfile" by ensuring Docker can read the target folder
         run: sudo chmod -R 777 target/
 
       - name: 🗑️ Clear Container Conflicts
-        # Solves "Conflict: Container name already in use"
-        run: |
-          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
+        run: sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
 
       - name: 🚀 Update Containers & Sync Config
         run: |
-          # 1. Create .env with secrets and JBoss LogManager fix
           printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\nJAVA_OPTS=-Djava.util.logging.manager=org.jboss.logmanager.LogManager\n" > .env
           
-          # 2. Generate docker-compose.yml dynamically for perfect path matching
           cat << 'EOF' > docker-compose.yml
           services:
             hoa-app:
@@ -59,7 +52,6 @@ jobs:
               ports:
                 - "8081:8080"
               restart: always
-
             hoa-tunnel:
               image: cloudflare/cloudflared:latest
               container_name: hoa-cloudflared
@@ -67,22 +59,15 @@ jobs:
               restart: always
           EOF
 
-          # 3. Deploy
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
-          
-          # 4. Storage cleanup on Beelink
           rm .env
           sudo /usr/bin/docker image prune -f
-          sudo rm -rf $GITHUB_WORKSPACE/target
 
       - name: 🔗 Get Quick Tunnel URL
         run: |
-          echo "Waiting 20 seconds for Cloudflare Tunnel URL..."
+          echo "Waiting 20 seconds for Cloudflare..."
           sleep 20
-          echo "------------------------------------------------"
-          echo "ACCESS YOUR PORTAL AT THE LINK BELOW:"
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet. Check logs manually."
-          echo "------------------------------------------------"
+          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet."
 
       - name: 🛡️ Post-Deployment Ownership Reset
         if: always()
