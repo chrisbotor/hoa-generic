@@ -3,33 +3,33 @@ name: HOA Portal Auto-Deploy
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # Allows you to trigger a deploy manually from the GitHub UI
+  workflow_dispatch: # Allows manual trigger from the GitHub web UI
 
 jobs:
   deploy:
-    runs-on: self-hosted # Targets your Beelink SER5 Pro runner
+    runs-on: self-hosted # Targets your Beelink runner (cbotor user)
 
     steps:
       - name: 📥 Pull latest code
         uses: actions/checkout@v4
 
       - name: 🧹 Fix Maven Permissions & Locks
-        # Uses the NOPASSWD permission we set in /etc/sudoers.d/cbotor-github-runner
+        # Uses the absolute paths to avoid "command not found" inside sudo
         run: |
           find ~/.m2/repository -name "*.lock" -delete || true
-          sudo chown -R $USER:$USER ~/.m2
-          sudo chmod -R 755 ~/.m2
+          sudo /usr/bin/chown -R $USER:$USER ~/.m2
+          sudo /usr/bin/chmod -R 755 ~/.m2
 
       - name: 🔨 Build Quarkus App
-        # -U forces Maven to update and fix any corrupted dependencies automatically
+        # -U forces Maven to ignore corrupted local caches (solar/network resilient)
         run: mvn clean package -U -DskipTests
 
       - name: 🚀 Update Containers
-        # --force-recreate ensures you never see the "Container name in use" error
-        # --remove-orphans keeps your Docker environment clean
+        # --force-recreate solves the "Container name in use" conflict
+        # --remove-orphans ensures a clean Docker environment
         run: |
-          sudo docker compose up -d --build --force-recreate --remove-orphans
+          sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
 
       - name: 📉 Clean Up Storage
-        # Essential for your 500GB NVMe to prevent disk bloat
-        run: sudo docker image prune -f
+        # Keeps your 500GB NVMe from filling up with old Docker images
+        run: sudo /usr/bin/docker image prune -f
