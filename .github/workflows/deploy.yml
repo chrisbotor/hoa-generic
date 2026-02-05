@@ -35,7 +35,6 @@ jobs:
           HASURA_URL=http://192.168.100.80:8080/v1/graphql
           HASURA_ADMIN_SECRET=myadminsecretkey
           EOF
-
                     
           # 2. Deploy using explicit pathing to force sudo to find the secrets
           sudo /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
