@@ -14,37 +14,25 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🧹 Pre-Build Cleanup
-        run: |
-          sudo /usr/bin/rm -rf target/ || true
-          sudo /usr/bin/chown -R $USER:$USER .
+        run: sudo /usr/bin/rm -rf target/ || true; sudo /usr/bin/chown -R $USER:$USER .
 
       - name: ☕ Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: maven
 
       - name: 🔨 Build Quarkus App
         run: ./mvnw clean package -U -DskipTests
 
       - name: 🗑️ Name Conflict Cleanup
-        run: |
-          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
+        run: sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
 
       - name: 🚀 Update Containers
-        run: |
-          printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\n" > .env
-          sudo /usr/bin/docker compose up -d --build --force-recreate
-          rm .env
+        run: printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\n" > .env; sudo /usr/bin/docker compose up -d --build --force-recreate; rm .env
 
       - name: 🔗 Get Quick Tunnel URL
-        run: |
-          echo "Waiting for Cloudflare to generate link..."
-          sleep 15
-          echo "--- YOUR PUBLIC URL IS BELOW ---"
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep "trycloudflare.com" || echo "Link not ready, check logs on Beelink manually."
-          echo "--------------------------------"
+        run: echo "Waiting for link..."; sleep 20; echo "--- YOUR PUBLIC URL ---"; sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep "trycloudflare.com" || echo "Link not ready."; echo "-----------------------"
 
       - name: 📉 Clean Up Storage
         run: sudo /usr/bin/docker image prune -f
