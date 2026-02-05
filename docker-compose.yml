@@ -1,0 +1,36 @@
+services:
+  hoa-web:
+    image: maven:3.9.9-eclipse-temurin-21-alpine
+    container_name: hoa-quarkus-app
+    restart: always
+    working_dir: /code
+    volumes:
+      - .:/code
+      - maven-repo:/root/.m2 
+    ports:
+      - "8080:8080"
+    environment:
+      - HASURA_URL=http://192.168.100.80:8080/v1/graphql
+      - HASURA_ADMIN_SECRET=myadminsecretkey
+      # This is the correct way to disable the Dev UI
+      - QUARKUS_DEV_UI_ENABLED=false
+    # We keep the 0.0.0.0 bind so the Tunnel can find it
+    command: mvn quarkus:dev -Dquarkus.http.host=0.0.0.0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: hoa-cloudflared
+    restart: always
+    #command: tunnel --no-autoupdate --url http://hoa-web:8080
+    command: tunnel --protocol http2 --no-autoupdate --url http://hoa-web:8080
+    depends_on:
+      hoa-web:
+        condition: service_healthy
+
+volumes:
+  maven-repo:
