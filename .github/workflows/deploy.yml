@@ -10,14 +10,17 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      - name: 🛡️ Force Cleanup Permissions
+        # This fixes the "EACCES: permission denied" error by taking ownership 
+        # of root-owned files before the runner tries to clean the workspace.
+        run: |
+          if [ -d "target" ]; then
+            sudo chown -R $USER:$USER target
+            sudo rm -rf target
+          fi
+
       - name: 📂 Checkout Repository
         uses: actions/checkout@v4
-
-      - name: 🧹 Pre-Build Cleanup & Permission Fix
-        run: |
-          # Remove old build files and ensure current user owns the folder
-          sudo /usr/bin/rm -rf target/ || true
-          sudo /usr/bin/chown -R $USER:$USER .
 
       - name: ☕ Set up JDK 21
         uses: actions/setup-java@v4
@@ -30,20 +33,20 @@ jobs:
 
       - name: 🛡️ Fix Build Permissions for Docker
         run: |
-          # Grant full permissions to the build output so the container can read it
+          # Ensure Docker container can read the generated JAR files
           sudo chmod -R 777 target/
 
       - name: 🗑️ Clear Container Conflicts
         run: |
-          # Force remove any existing containers with these names to avoid "Conflict" errors
+          # Prevents "Conflict. The container name is already in use"
           sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
 
       - name: 🚀 Update Containers & Fix LogManager
         run: |
-          # 1. Create temporary .env with JBoss LogManager fix
+          # 1. Create .env with secrets and JBoss LogManager fix
           printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\nJAVA_OPTS=-Djava.util.logging.manager=org.jboss.logmanager.LogManager\n" > .env
           
-          # 2. Deploy and build (using --remove-orphans as an extra safety measure)
+          # 2. Deploy
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
           # 3. Cleanup storage on Beelink
@@ -59,3 +62,7 @@ jobs:
           echo "ACCESS YOUR PORTAL AT THE LINK BELOW:"
           sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet."
           echo "------------------------------------------------"
+
+      - name: 🛡️ Post-Deployment Ownership Reset
+        if: always()
+        run: sudo /usr/bin/chown -R $USER:$USER .
