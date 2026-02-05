@@ -3,42 +3,47 @@ name: HOA Portal Auto-Deploy
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # Allows manual trigger from the GitHub UI
+  workflow_dispatch:
 
 jobs:
   deploy:
-    runs-on: self-hosted # Targets your Beelink runner (cbotor user)
+    runs-on: self-hosted
 
     steps:
       - name: 📥 Pull latest code
         uses: actions/checkout@v4
 
-      - name: 🧹 Fix Permissions & Cleanup
-        # Uses the NOPASSWD permissions we set in /etc/sudoers.d/cbotor-github-runner
-        # We wipe 'target' first because Docker/Root-owned files block Maven
+      - name: 🧹 Pre-Build Cleanup
+        # Wipe target and fix ownership in case a previous run crashed
         run: |
           sudo /usr/bin/rm -rf target/ || true
           sudo /usr/bin/chown -R $USER:$USER .
           find ~/.m2/repository -name "*.lock" -delete || true
           sudo /usr/bin/chown -R $USER:$USER ~/.m2
-          sudo /usr/bin/chmod -R 755 ~/.m2
 
       - name: 🔨 Build Quarkus App
-        # -U forces Maven to ignore corrupted local caches (solar/network resilient)
+        # -U ensures a fresh download if anything was corrupted
         run: mvn clean package -U -DskipTests
 
       - name: 🛑 Docker Name Conflict Cleanup
-        # Explicitly kill conflicting containers before the 'up' command
+        # Prevents "Container name in use" errors for all services
         run: |
-          sudo /usr/bin/docker rm -f hoa-quarkus-app || true
-          sudo /usr/bin/docker rm -f hoa-cloudflared || true
+          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
           sudo /usr/bin/docker compose down --remove-orphans || true
 
       - name: 🚀 Update Containers
-        # --force-recreate ensures you never see the "Container name in use" error
+        # --force-recreate ensures a fresh start for the subdivision portal
         run: |
           sudo /usr/bin/docker compose up -d --build --force-recreate
 
       - name: 📉 Clean Up Storage
-        # Essential for maintaining your 500GB NVMe drive
+        # Keeps your 500GB NVMe lean
         run: sudo /usr/bin/docker image prune -f
+
+      - name: 🛡️ Post-Deployment Ownership Reset
+        # THE FIX: This runs even if the build fails. It resets ownership
+        # so GitHub's built-in cleanup can delete files next time.
+        if: always()
+        run: |
+          sudo /usr/bin/chown -R $USER:$USER .
+          sudo /usr/bin/rm -rf target/ || true
