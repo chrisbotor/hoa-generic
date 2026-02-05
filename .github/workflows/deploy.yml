@@ -1,60 +1,23 @@
 name: HOA Portal Auto-Deploy
-
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
-
 jobs:
   deploy:
     runs-on: self-hosted
-
     steps:
       - name: 📂 Checkout Repository
         uses: actions/checkout@v4
-
-      - name: 🧹 Pre-Build Cleanup
-        run: |
-          sudo /usr/bin/rm -rf target/ || true
-          sudo /usr/bin/chown -R $USER:$USER .
-
-      - name: ☕ Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: 🔨 Build Quarkus App
-        run: ./mvnw clean package -U -DskipTests
-
-      - name: 🗑️ Name Conflict Cleanup
-        run: |
-          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
-
+      - name: 🔨 Build App
+        run: ./mvnw clean package -DskipTests
       - name: 🚀 Update Containers
         run: |
-          # Ensure every line below 'run: |' is indented by at least 10 spaces
           cat <<EOF > $GITHUB_WORKSPACE/.env
           DB_USER=${{ secrets.DB_USER }}
           DB_PASS=${{ secrets.DB_PASS }}
           HASURA_URL=http://192.168.100.80:8080/v1/graphql
           HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}
           EOF
-
-          # Deploy using the explicit .env file path
+          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
           sudo /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
-
-          # Display the Quick Tunnel URL
-          sleep 5
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep "trycloudflare.com" || echo "Tunnel link not ready yet."
-
-          # Security cleanup
           sudo /usr/bin/rm $GITHUB_WORKSPACE/.env
-
-      - name: 📉 Clean Up Storage
-        run: sudo /usr/bin/docker image prune -f
-
-      - name: 🛡️ Post-Deployment Ownership
-        if: always()
-        run: sudo /usr/bin/chown -R $USER:$USER .
