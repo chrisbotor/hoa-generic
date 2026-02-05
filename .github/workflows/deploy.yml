@@ -9,22 +9,22 @@ jobs:
     steps:
       - name: 📂 Checkout Repository
         uses: actions/checkout@v4
-      - name: 🧹 Cleanup
+      - name: 🧹 Pre-Build Cleanup
         run: sudo /usr/bin/rm -rf target/ || true
       - name: ☕ Set up Java
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-      - name: 🔨 Build
+      - name: 🔨 Build Quarkus App
         run: ./mvnw clean package -DskipTests
       - name: 🚀 Update Containers
         run: |
           printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\n" > .env
           sudo /usr/bin/docker compose up -d --build --force-recreate
           rm .env
-      - name: 🔗 Get URL
+      - name: 🔗 Get Quick Tunnel URL
         run: |
-          echo "Waiting for tunnel..."
+          echo "Waiting 20s for Cloudflare..."
           sleep 20
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep "trycloudflare.com" || echo "Link not ready."
+          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep "trycloudflare.com" || echo "Link not ready yet."
