@@ -11,6 +11,7 @@ jobs:
 
     steps:
       - name: 🛡️ Force Cleanup Permissions
+        # Solves "EACCES: permission denied" by reclaiming ownership of target
         run: |
           if [ -d "target" ]; then
             sudo chown -R $USER:$USER target
@@ -30,22 +31,24 @@ jobs:
         run: ./mvnw clean package -U -DskipTests
 
       - name: 🛡️ Fix Build Permissions
+        # Solves "Unable to access jarfile" by ensuring Docker can read the file
         run: sudo chmod -R 777 target/
 
       - name: 🗑️ Clear Container Conflicts
+        # Prevents "Conflict: Container name already in use"
         run: |
           sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
 
       - name: 🚀 Update Containers & Sync Config
         run: |
-          # 1. Create .env for secrets
+          # 1. Create .env for database secrets
           printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\n" > .env
           
-          # 2. Find the exact jar name (usually ends in -runner.jar)
+          # 2. Identify the specific runner jar file
           JAR_NAME=$(ls target/*-runner.jar | xargs basename)
-          echo "Found JAR: $JAR_NAME"
+          echo "Building with JAR: $JAR_NAME"
 
-          # 3. Generate docker-compose.yml dynamically
+          # 3. Generate docker-compose.yml with the JAR filename injected directly
           cat << EOF > docker-compose.yml
           services:
             hoa-app:
@@ -57,8 +60,8 @@ jobs:
               environment:
                 - DB_USER=\${DB_USER}
                 - DB_PASS=\${DB_PASS}
-              # LogManager is still required on Java 21 even for Uber-Jars
-              command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar /deployments/\$JAR_NAME
+              # Hardcoded LogManager and fixed path to the JAR
+              command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar /deployments/$JAR_NAME
               ports:
                 - "8081:8080"
               restart: always
@@ -70,10 +73,10 @@ jobs:
               restart: always
           EOF
 
-          # 4. Deploy
+          # 4. Deploy using fresh config
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
-          # 5. Cleanup storage
+          # 5. Cleanup temporary storage
           rm .env
           sudo /usr/bin/docker image prune -f
 
