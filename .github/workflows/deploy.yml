@@ -15,9 +15,8 @@ jobs:
 
       - name: 🧹 Pre-Build Cleanup
         run: |
-          # Ensure target folder is cleared and permissions are set for the runner
-          sudo rm -rf target/
-          sudo chown -R $USER:$USER .
+          sudo /usr/bin/rm -rf target/ || true
+          sudo /usr/bin/chown -R $USER:$USER .
 
       - name: ☕ Set up JDK 21
         uses: actions/setup-java@v4
@@ -31,13 +30,11 @@ jobs:
 
       - name: 🗑️ Name Conflict Cleanup
         run: |
-          # Forcefully remove old containers to clear naming conflicts
           sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
 
       - name: 🚀 Update Containers
         run: |
-          # 1. Create the .env file using the absolute workspace path
-          # Indentation here is critical to avoid YAML parser errors
+          # Ensure every line below 'run: |' is indented by at least 10 spaces
           cat <<EOF > $GITHUB_WORKSPACE/.env
           DB_USER=${{ secrets.DB_USER }}
           DB_PASS=${{ secrets.DB_PASS }}
@@ -45,15 +42,19 @@ jobs:
           HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}
           EOF
 
-          # 2. Deploy using the .env file and explicit pathing
+          # Deploy using the explicit .env file path
           sudo /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
 
-          # 3. Security cleanup: remove the temporary .env file
+          # Display the Quick Tunnel URL
+          sleep 5
+          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep "trycloudflare.com" || echo "Tunnel link not ready yet."
+
+          # Security cleanup
           sudo /usr/bin/rm $GITHUB_WORKSPACE/.env
 
-      - name: 🧹 Storage Cleanup
+      - name: 📉 Clean Up Storage
         run: sudo /usr/bin/docker image prune -f
 
-      - name: 🛡️ Post-Deployment Permissions
+      - name: 🛡️ Post-Deployment Ownership
         if: always()
-        run: sudo chown -R $USER:$USER .
+        run: sudo /usr/bin/chown -R $USER:$USER .
