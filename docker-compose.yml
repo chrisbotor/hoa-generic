@@ -8,8 +8,8 @@ services:
     environment:
       # Database Connection (.80)
       - QUARKUS_DATASOURCE_JDBC_URL=jdbc:postgresql://192.168.100.80:5432/hoa_db
-      - QUARKUS_DATASOURCE_USERNAME=${{secrets.DB_USER}}
-      - QUARKUS_DATASOURCE_PASSWORD=${{secrets.DB_PASS}}
+      - QUARKUS_DATASOURCE_USERNAME=${{ secrets.DB_USER }}
+      - QUARKUS_DATASOURCE_PASSWORD=${{ secrets.DB_PASS }}
       # Hasura Integration
       - HASURA_GRAPHQL_ENDPOINT=http://192.168.100.80:8080/v1/graphql
       - HASURA_GRAPHQL_ADMIN_SECRET=${secrets.HASURA_SECRET}
@@ -30,7 +30,7 @@ services:
     image: cloudflare/cloudflared:latest
     restart: always
     environment:
-      - TUNNEL_TOKEN=${{secrets.CLOUDFLARE_TOKEN}}
+      - TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}
     command: tunnel --no-autoupdate run
     depends_on:
       hoa-quarkus-app:
