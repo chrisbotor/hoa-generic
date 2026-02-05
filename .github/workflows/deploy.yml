@@ -14,7 +14,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🧹 Pre-Build Cleanup
-        # Wipe target and fix ownership in case a previous run crashed
         run: |
           sudo /usr/bin/rm -rf target/ || true
           sudo /usr/bin/chown -R $USER:$USER .
@@ -22,27 +21,27 @@ jobs:
           sudo /usr/bin/chown -R $USER:$USER ~/.m2
 
       - name: 🔨 Build Quarkus App
-        # -U ensures a fresh download if anything was corrupted
         run: mvn clean package -U -DskipTests
 
       - name: 🛑 Docker Name Conflict Cleanup
-        # Prevents "Container name in use" errors for all services
         run: |
           sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
           sudo /usr/bin/docker compose down --remove-orphans || true
 
       - name: 🚀 Update Containers
-        # --force-recreate ensures a fresh start for the subdivision portal
+        # Map your GitHub Secrets to Environment Variables
+        env:
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
         run: |
-          sudo /usr/bin/docker compose up -d --build --force-recreate
+          # Use 'sudo -E' to pass these secrets into the docker-compose environment
+          sudo -E /usr/bin/docker compose up -d --build --force-recreate
 
       - name: 📉 Clean Up Storage
-        # Keeps your 500GB NVMe lean
         run: sudo /usr/bin/docker image prune -f
 
       - name: 🛡️ Post-Deployment Ownership Reset
-        # THE FIX: This runs even if the build fails. It resets ownership
-        # so GitHub's built-in cleanup can delete files next time.
         if: always()
         run: |
           sudo /usr/bin/chown -R $USER:$USER .
