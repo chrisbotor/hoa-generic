@@ -30,19 +30,18 @@ jobs:
 
       - name: 🚀 Update Containers
         run: |
-          # 1. Create the .env file in the current workspace directory
-          # We use $GITHUB_WORKSPACE to get the absolute path on your Beelink
+          # Create the .env file with absolute pathing
+          # This is where the GitHub Secrets actually get turned into Docker variables
           sudo /usr/bin/tee $GITHUB_WORKSPACE/.env <<EOF
           DB_USER=${{ secrets.DB_USER }}
           DB_PASS=${{ secrets.DB_PASS }}
           CLOUDFLARE_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}
+          HASURA_SECRET=${{ secrets.HASURA_SECRET }}
           EOF
           
-          # 2. Deploy using the ABSOLUTE path to the .env file
-          # This forces Docker to see the secrets regardless of the sudo context
-          sudo /usr/bin/docker compose --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
+          # Deploy using the explicit env-file flag
+          sudo /usr/bin/docker compose --project-directory . --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
           
-          # 3. Security cleanup
           sudo /usr/bin/rm $GITHUB_WORKSPACE/.env
 
       - name: 📉 Clean Up Storage
