@@ -34,18 +34,20 @@ jobs:
 
       - name: 🚀 Update Containers
         run: |
-          # Passing variables directly to bypass the .env indentation issue
-          DB_USER=${{ secrets.DB_USER }} \
-          DB_PASS=${{ secrets.DB_PASS }} \
-          HASURA_URL=http://192.168.100.80:8080/v1/graphql \
-          HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }} \
-          sudo -E /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE up -d --build --force-recreate
+          # Injecting variables after sudo to avoid the environment preservation error
+          sudo DB_USER=${{ secrets.DB_USER }} \
+               DB_PASS=${{ secrets.DB_PASS }} \
+               HASURA_URL=http://192.168.100.80:8080/v1/graphql \
+               HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }} \
+               /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE up -d --build --force-recreate
 
       - name: 🔗 Get Quick Tunnel URL
         run: |
           echo "Waiting for Cloudflare to generate link..."
-          sleep 10
+          sleep 12
+          echo "--- YOUR PUBLIC URL IS BELOW ---"
           sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep "trycloudflare.com" || echo "Link not ready, check logs on Beelink manually."
+          echo "--------------------------------"
 
       - name: 📉 Clean Up Storage
         run: sudo /usr/bin/docker image prune -f
