@@ -29,14 +29,18 @@ jobs:
           sudo /usr/bin/docker compose down --remove-orphans || true
 
       - name: 🚀 Update Containers
-        # Map your GitHub Secrets to Environment Variables
-        env:
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASS: ${{ secrets.DB_PASS }}
-          CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
         run: |
-          # Use 'sudo -E' to pass these secrets into the docker-compose environment
-          sudo -E /usr/bin/docker compose up -d --build --force-recreate
+          # 1. Create a local .env file from GitHub Secrets
+          # This ensures Docker Compose sees the variables even through sudo
+          echo "DB_USER=${{ secrets.DB_USER }}" > .env
+          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
+          echo "CLOUDFLARE_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}" >> .env
+          
+          # 2. Deploy (Docker Compose reads .env automatically)
+          sudo /usr/bin/docker compose up -d --build --force-recreate
+          
+          # 3. Clean up the secret file immediately
+          rm .env
 
       - name: 📉 Clean Up Storage
         run: sudo /usr/bin/docker image prune -f
