@@ -30,18 +30,19 @@ jobs:
 
       - name: 🚀 Update Containers
         run: |
-          # Create the .env file with absolute pathing
-          # This is where the GitHub Secrets actually get turned into Docker variables
+          # Create the .env file with absolute pathing for the Beelink workspace
           sudo /usr/bin/tee $GITHUB_WORKSPACE/.env <<EOF
           DB_USER=${{ secrets.DB_USER }}
           DB_PASS=${{ secrets.DB_PASS }}
           CLOUDFLARE_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}
-          HASURA_SECRET=${{ secrets.HASURA_SECRET }}
+          HASURA_URL=http://192.168.100.80:8080/v1/graphql
+          HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}
           EOF
           
-          # Deploy using the explicit env-file flag
+          # Deploy using the explicit env-file flag and workspace path
           sudo /usr/bin/docker compose --project-directory . --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
           
+          # Securely remove the temporary secret file
           sudo /usr/bin/rm $GITHUB_WORKSPACE/.env
 
       - name: 📉 Clean Up Storage
