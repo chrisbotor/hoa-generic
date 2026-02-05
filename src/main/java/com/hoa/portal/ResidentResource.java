@@ -72,7 +72,7 @@ public class ResidentResource {
                 <html lang="en">
                 <head>
                     <meta charset="UTF-8">
-                    <title>HOA Portal</title>
+                    <title>HOA <Name of Subdivision> Portal</title>
                     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
                     <style>
                         body { background-color: #f8f9fa; font-family: sans-serif; }
