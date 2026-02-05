@@ -13,8 +13,9 @@ jobs:
       - name: 📂 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 🧹 Pre-Build Cleanup
+      - name: 🧹 Pre-Build Cleanup & Permission Fix
         run: |
+          # Remove old build files and ensure current user owns the folder
           sudo /usr/bin/rm -rf target/ || true
           sudo /usr/bin/chown -R $USER:$USER .
 
@@ -27,32 +28,34 @@ jobs:
       - name: 🔨 Build Quarkus App
         run: ./mvnw clean package -U -DskipTests
 
-      - name: 🗑️ Name Conflict Cleanup
+      - name: 🛡️ Fix Build Permissions for Docker
         run: |
-          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
+          # Grant full permissions to the build output so the container can read it
+          sudo chmod -R 777 target/
+
+      - name: 🗑️ Clear Container Conflicts
+        run: |
+          # Force remove any existing containers with these names to avoid "Conflict" errors
+          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
 
       - name: 🚀 Update Containers & Fix LogManager
         run: |
-          # 1. Create temporary .env with secrets and JBoss LogManager fix
+          # 1. Create temporary .env with JBoss LogManager fix
           printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\nJAVA_OPTS=-Djava.util.logging.manager=org.jboss.logmanager.LogManager\n" > .env
           
-          # 2. Deploy and build
-          sudo /usr/bin/docker compose up -d --build --force-recreate
+          # 2. Deploy and build (using --remove-orphans as an extra safety measure)
+          sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
-          # 3. Securely remove the .env and prune old Docker images to save space on Beelink
+          # 3. Cleanup storage on Beelink
           rm .env
           sudo /usr/bin/docker image prune -f
           sudo rm -rf $GITHUB_WORKSPACE/target
 
       - name: 🔗 Get Quick Tunnel URL
         run: |
-          echo "Waiting 20 seconds for Cloudflare to assign a URL..."
+          echo "Waiting 20 seconds for Cloudflare..."
           sleep 20
           echo "------------------------------------------------"
           echo "ACCESS YOUR PORTAL AT THE LINK BELOW:"
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet. Check logs manually."
+          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet."
           echo "------------------------------------------------"
-
-      - name: 🛡️ Post-Deployment Ownership Reset
-        if: always()
-        run: sudo /usr/bin/chown -R $USER:$USER .
