@@ -11,7 +11,6 @@ jobs:
 
     steps:
       - name: 🛡️ Force Cleanup Permissions
-        # Solves "EACCES: permission denied" by taking ownership of old root-owned files
         run: |
           if [ -d "target" ]; then
             sudo chown -R $USER:$USER target
@@ -27,37 +26,39 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: 🔨 Build Quarkus App
+      - name: 🔨 Build Quarkus App (Uber-Jar)
         run: ./mvnw clean package -U -DskipTests
 
-      - name: 🛡️ Fix Build Permissions for Docker
-        # Solves "Unable to access jarfile" by ensuring Docker can read the target folder
+      - name: 🛡️ Fix Build Permissions
         run: sudo chmod -R 777 target/
 
       - name: 🗑️ Clear Container Conflicts
-        # Prevents "Conflict: Container name already in use"
         run: |
           sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
 
       - name: 🚀 Update Containers & Sync Config
         run: |
-          # 1. Create .env for database secrets
+          # 1. Create .env for secrets
           printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\n" > .env
           
-          # 2. Generate docker-compose.yml with the LogManager HARDCODED in the command
-          cat << 'EOF' > docker-compose.yml
+          # 2. Find the exact jar name (usually ends in -runner.jar)
+          JAR_NAME=$(ls target/*-runner.jar | xargs basename)
+          echo "Found JAR: $JAR_NAME"
+
+          # 3. Generate docker-compose.yml dynamically
+          cat << EOF > docker-compose.yml
           services:
             hoa-app:
               image: eclipse-temurin:21-jre-jammy
               container_name: hoa-quarkus-app
               volumes:
-                - ./target/quarkus-app:/deployments:z
+                - ./target:/deployments:z
               working_dir: /deployments
               environment:
-                - DB_USER=${DB_USER}
-                - DB_PASS=${DB_PASS}
-              # Hardcoding the LogManager here is the only way to stop the 'Restarting' loop
-              command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar /deployments/quarkus-run.jar
+                - DB_USER=\${DB_USER}
+                - DB_PASS=\${DB_PASS}
+              # LogManager is still required on Java 21 even for Uber-Jars
+              command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar /deployments/\$JAR_NAME
               ports:
                 - "8081:8080"
               restart: always
@@ -69,21 +70,20 @@ jobs:
               restart: always
           EOF
 
-          # 3. Deploy
+          # 4. Deploy
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
-          # 4. Storage cleanup
+          # 5. Cleanup storage
           rm .env
           sudo /usr/bin/docker image prune -f
-          sudo rm -rf $GITHUB_WORKSPACE/target
 
       - name: 🔗 Get Quick Tunnel URL
         run: |
-          echo "Waiting 20 seconds for Cloudflare..."
+          echo "Waiting 20 seconds for Cloudflare URL..."
           sleep 20
           echo "------------------------------------------------"
           echo "ACCESS YOUR PORTAL AT THE LINK BELOW:"
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet."
+          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet. Check logs manually."
           echo "------------------------------------------------"
 
       - name: 🛡️ Post-Deployment Ownership Reset
