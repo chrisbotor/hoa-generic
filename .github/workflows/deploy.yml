@@ -29,7 +29,7 @@ jobs:
 
       - name: 🚀 Update Containers
         run: |
-         cat <<EOF > $GITHUB_WORKSPACE/.env
+         cat << EOF > $GITHUB_WORKSPACE/.env
          DB_USER=hoa_admin
          DB_PASS=qwertyuiop
          HASURA_URL=http://192.168.100.80:8080/v1/graphql
