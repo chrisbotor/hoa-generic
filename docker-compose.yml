@@ -22,3 +22,5 @@ services:
       - hoa-network
 
   # ... Cloudflared and Web services stay the same ...
+networks:
+  hoa-network: {} # <--- YOU MUST HAVE THESE CURLY BRACES OR IT IS 'UNDEFINED'
