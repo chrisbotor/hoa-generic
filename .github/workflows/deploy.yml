@@ -11,6 +11,7 @@ jobs:
 
     steps:
       - name: 🛡️ Force Cleanup Permissions
+        # Fixes "EACCES: permission denied" during checkout
         run: |
           if [ -d "target" ]; then
             sudo chown -R $USER:$USER target
@@ -30,17 +31,23 @@ jobs:
         run: ./mvnw clean package -U -DskipTests
 
       - name: 🛡️ Fix Build Permissions for Docker
-        run: |
-          sudo chmod -R 777 target/
+        # Fixes "Unable to access jarfile" by letting Docker read the files
+        run: sudo chmod -R 777 target/
 
       - name: 🗑️ Clear Container Conflicts
+        # Prevents "Conflict: Container name already in use"
         run: |
           sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
 
       - name: 🚀 Update Containers & Fix LogManager
         run: |
+          # 1. Create .env with secrets and LogManager fix
           printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\nJAVA_OPTS=-Djava.util.logging.manager=org.jboss.logmanager.LogManager\n" > .env
+          
+          # 2. Deploy
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
+          
+          # 3. Cleanup storage on Beelink
           rm .env
           sudo /usr/bin/docker image prune -f
           sudo rm -rf $GITHUB_WORKSPACE/target
@@ -49,4 +56,11 @@ jobs:
         run: |
           echo "Waiting 20 seconds for Cloudflare..."
           sleep 20
+          echo "------------------------------------------------"
+          echo "ACCESS YOUR PORTAL AT THE LINK BELOW:"
           sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet."
+          echo "------------------------------------------------"
+
+      - name: 🛡️ Post-Deployment Ownership Reset
+        if: always()
+        run: sudo /usr/bin/chown -R $USER:$USER .
