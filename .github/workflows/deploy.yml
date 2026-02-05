@@ -31,13 +31,20 @@ jobs:
         run: |
           # 1. Create the .env file using the absolute workspace path
           # We map HASURA_SECRET (GitHub) to HASURA_ADMIN_SECRET (Java App) here
+          #sudo /usr/bin/tee $GITHUB_WORKSPACE/.env <<EOF
+          #DB_USER=${{ secrets.DB_USER }}
+          #DB_PASS=${{ secrets.DB_PASS }}
+          #CLOUDFLARE_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}
+          #HASURA_URL=http://192.168.100.80:8080/v1/graphql
+          #HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}
+          #EOF
           sudo /usr/bin/tee $GITHUB_WORKSPACE/.env <<EOF
           DB_USER=${{ secrets.DB_USER }}
           DB_PASS=${{ secrets.DB_PASS }}
-          #CLOUDFLARE_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}
           HASURA_URL=http://192.168.100.80:8080/v1/graphql
           HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}
           EOF
+
           
           # 2. Deploy using explicit pathing to force sudo to find the secrets
           sudo /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
