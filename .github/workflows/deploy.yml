@@ -34,26 +34,18 @@ jobs:
 
       - name: 🚀 Update Containers
         run: |
-          # We pass the values directly to the command
-          DB_USER=hoa_admin \
-          DB_PASS=qwertyuiop \
+          # Passing variables directly to bypass the .env indentation issue
+          DB_USER=${{ secrets.DB_USER }} \
+          DB_PASS=${{ secrets.DB_PASS }} \
           HASURA_URL=http://192.168.100.80:8080/v1/graphql \
-          HASURA_ADMIN_SECRET=myadminsecretkey \
+          HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }} \
           sudo -E /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE up -d --build --force-recreate
-          
-          # Deploy using the explicit .env file path
-          sudo /usr/bin/docker compose --project-directory $GITHUB_WORKSPACE --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
-          
-          # Wait 5 seconds for tunnel initialization
-          sleep 5
-          
-          # Find and print the Quick Tunnel URL to the GitHub logs
-          echo "--- YOUR PUBLIC URL IS BELOW ---"
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep "trycloudflare.com" || echo "Tunnel link not ready yet."
-          echo "--------------------------------"
 
-          # Security cleanup
-          sudo /usr/bin/rm $GITHUB_WORKSPACE/.env
+      - name: 🔗 Get Quick Tunnel URL
+        run: |
+          echo "Waiting for Cloudflare to generate link..."
+          sleep 10
+          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep "trycloudflare.com" || echo "Link not ready, check logs on Beelink manually."
 
       - name: 📉 Clean Up Storage
         run: sudo /usr/bin/docker image prune -f
