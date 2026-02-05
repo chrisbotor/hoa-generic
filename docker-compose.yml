@@ -1,36 +1,53 @@
+version: '3.8'
+
 services:
-  hoa-web:
-    image: maven:3.9.9-eclipse-temurin-21-alpine
+  # 1. The Core App (Quarkus)
+  hoa-quarkus-app:
     container_name: hoa-quarkus-app
-    restart: always
-    working_dir: /code
-    volumes:
-      - .:/code
-      - maven-repo:/root/.m2 
-    ports:
-      - "8080:8080"
+    build: 
+      context: .
+      dockerfile: src/main/docker/Dockerfile.jvm
     environment:
-      - HASURA_URL=http://192.168.100.80:8080/v1/graphql
-      - HASURA_ADMIN_SECRET=myadminsecretkey
-      # This is the correct way to disable the Dev UI
-      - QUARKUS_DEV_UI_ENABLED=false
-    # We keep the 0.0.0.0 bind so the Tunnel can find it
-    command: mvn quarkus:dev -Dquarkus.http.host=0.0.0.0
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "8080"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  tunnel:
-    image: cloudflare/cloudflared:latest
-    container_name: hoa-cloudflared
+      - QUARKUS_DATASOURCE_JDBC_URL=jdbc:postgresql://192.168.1.80:5432/hoa_db
+      - QUARKUS_DATASOURCE_USERNAME=${DB_USER}
+      - QUARKUS_DATASOURCE_PASSWORD=${DB_PASS}
     restart: always
-    #command: tunnel --no-autoupdate --url http://hoa-web:8080
-    command: tunnel --protocol http2 --no-autoupdate --url http://hoa-web:8080
-    depends_on:
-      hoa-web:
-        condition: service_healthy
+    healthcheck:
+      # Quarkus SmallRye Health default endpoint
+      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health/live"]
+      interval: 15s      # Check every 15s
+      timeout: 10s      # Give it 10s to respond (vital for Beelink stability)
+      retries: 5        # Allow 5 failures before marking unhealthy
+      start_period: 90s # HIGHLY RECOMMENDED: 90s grace period for Java startup
+    networks:
+      - hoa-network
 
-volumes:
-  maven-repo:
+  # 2. The Cloudflare Tunnel
+  hoa-cloudflared:
+    container_name: hoa-cloudflared
+    image: cloudflare/cloudflared:latest
+    restart: always
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN}
+    command: tunnel --no-autoupdate run
+    depends_on:
+      hoa-quarkus-app:
+        condition: service_healthy # Waits for Java to be fully ready before exposing
+    networks:
+      - hoa-network
+
+  # 3. The Web Frontend (Nginx/React/etc)
+  hoa-web:
+    container_name: hoa-web
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    depends_on:
+      hoa-quarkus-app:
+        condition: service_healthy
+    networks:
+      - hoa-network
+
+networks:
+  hoa-network:
+    driver: bridge
