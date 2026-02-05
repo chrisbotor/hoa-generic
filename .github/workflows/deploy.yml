@@ -3,33 +3,36 @@ name: HOA Portal Auto-Deploy
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # Allows manual trigger from the GitHub web UI
+  workflow_dispatch:
 
 jobs:
   deploy:
-    runs-on: self-hosted # Targets your Beelink runner (cbotor user)
+    runs-on: self-hosted
 
     steps:
       - name: 📥 Pull latest code
         uses: actions/checkout@v4
 
       - name: 🧹 Fix Maven Permissions & Locks
-        # Uses the absolute paths to avoid "command not found" inside sudo
         run: |
           find ~/.m2/repository -name "*.lock" -delete || true
           sudo /usr/bin/chown -R $USER:$USER ~/.m2
           sudo /usr/bin/chmod -R 755 ~/.m2
 
       - name: 🔨 Build Quarkus App
-        # -U forces Maven to ignore corrupted local caches (solar/network resilient)
         run: mvn clean package -U -DskipTests
 
-      - name: 🚀 Update Containers
-        # --force-recreate solves the "Container name in use" conflict
-        # --remove-orphans ensures a clean Docker environment
+      - name: 🛑 Pre-Deployment Cleanup
+        # This step forces the removal of the specific conflicting container
+        # The "|| true" ensures the script doesn't fail if the container is already gone
         run: |
-          sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
+          sudo /usr/bin/docker rm -f hoa-quarkus-app || true
+          sudo /usr/bin/docker compose down --remove-orphans || true
+
+      - name: 🚀 Update Containers
+        # Now that the name is definitely free, we can start fresh
+        run: |
+          sudo /usr/bin/docker compose up -d --build --force-recreate
 
       - name: 📉 Clean Up Storage
-        # Keeps your 500GB NVMe from filling up with old Docker images
         run: sudo /usr/bin/docker image prune -f
