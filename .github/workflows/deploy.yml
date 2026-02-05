@@ -30,20 +30,20 @@ jobs:
 
       - name: 🚀 Update Containers
         run: |
-          # 1. Create the .env file with root authority via tee
-          # This ensures the file exists even if the directory has strict permissions
-          sudo /usr/bin/tee .env <<EOF
+          # 1. Create the .env file in the current workspace directory
+          # We use $GITHUB_WORKSPACE to get the absolute path on your Beelink
+          sudo /usr/bin/tee $GITHUB_WORKSPACE/.env <<EOF
           DB_USER=${{ secrets.DB_USER }}
           DB_PASS=${{ secrets.DB_PASS }}
           CLOUDFLARE_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}
           EOF
           
-          # 2. Deploy using the explicit --env-file flag
-          # We REMOVED the '-E' flag here to stop the sudo environment error
-          sudo /usr/bin/docker compose --env-file .env up -d --build --force-recreate
+          # 2. Deploy using the ABSOLUTE path to the .env file
+          # This forces Docker to see the secrets regardless of the sudo context
+          sudo /usr/bin/docker compose --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
           
           # 3. Security cleanup
-          sudo /usr/bin/rm .env
+          sudo /usr/bin/rm $GITHUB_WORKSPACE/.env
 
       - name: 📉 Clean Up Storage
         run: sudo /usr/bin/docker image prune -f
