@@ -1,55 +1,51 @@
-name: HOA Portal Auto-Deploy
+services:
+  hoa-quarkus-app:
+    container_name: hoa-quarkus-app
+    build: 
+      context: .
+      dockerfile: src/main/docker/Dockerfile.jvm
+    environment:
+      - QUARKUS_DATASOURCE_JDBC_URL=jdbc:postgresql://192.168.100.80:5432/hoa_db
+      - QUARKUS_DATASOURCE_USERNAME=${DB_USER}
+      - QUARKUS_DATASOURCE_PASSWORD=${DB_PASS}
+      # These must match your application.properties exactly
+      - HASURA_URL=${HASURA_URL}
+      - HASURA_ADMIN_SECRET=${HASURA_ADMIN_SECRET}
+    restart: always
+    healthcheck:
+      # Use a robust port check if wget/curl are unreliable
+      test: ["CMD-SHELL", "nc -z localhost 8080 || wget -q --spider http://localhost:8080/q/health/live || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    networks:
+      - hoa-network
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  hoa-cloudflared:
+    container_name: hoa-cloudflared
+    image: cloudflare/cloudflared:latest
+    restart: always
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN}
+    command: tunnel --no-autoupdate run
+    depends_on:
+      hoa-quarkus-app:
+        condition: service_healthy
+    networks:
+      - hoa-network
 
-jobs:
-  deploy:
-    runs-on: self-hosted
+  hoa-web:
+    container_name: hoa-web
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    depends_on:
+      hoa-quarkus-app:
+        condition: service_healthy
+    networks:
+      - hoa-network
 
-    steps:
-      - name: 📥 Pull latest code
-        uses: actions/checkout@v4
-
-      - name: 🧹 Pre-Build Cleanup
-        run: |
-          sudo /usr/bin/rm -rf target/ || true
-          sudo /usr/bin/chown -R $USER:$USER .
-          find ~/.m2/repository -name "*.lock" -delete || true
-          sudo /usr/bin/chown -R $USER:$USER ~/.m2
-
-      - name: 🔨 Build Quarkus App
-        run: mvn clean package -U -DskipTests
-
-      - name: 🛑 Docker Name Conflict Cleanup
-        run: |
-          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
-          sudo /usr/bin/docker compose down --remove-orphans || true
-
-      - name: 🚀 Update Containers
-        run: |
-          # Create the .env file with absolute pathing for the Beelink workspace
-          sudo /usr/bin/tee $GITHUB_WORKSPACE/.env <<EOF
-          DB_USER=${{ secrets.DB_USER }}
-          DB_PASS=${{ secrets.DB_PASS }}
-          CLOUDFLARE_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}
-          HASURA_URL=http://192.168.100.80:8080/v1/graphql
-          HASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}
-          EOF
-          
-          # Deploy using the explicit env-file flag and workspace path
-          sudo /usr/bin/docker compose --project-directory . --env-file $GITHUB_WORKSPACE/.env up -d --build --force-recreate
-          
-          # Securely remove the temporary secret file
-          sudo /usr/bin/rm $GITHUB_WORKSPACE/.env
-
-      - name: 📉 Clean Up Storage
-        run: sudo /usr/bin/docker image prune -f
-
-      - name: 🛡️ Post-Deployment Ownership Reset
-        if: always()
-        run: |
-          sudo /usr/bin/chown -R $USER:$USER .
-          sudo /usr/bin/rm -rf target/ || true
+networks:
+  hoa-network:
+    driver: bridge
