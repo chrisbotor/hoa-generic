@@ -34,6 +34,7 @@ jobs:
 
       - name: 🚀 Update Containers
         run: |
+          
           cat <<EOF > $GITHUB_WORKSPACE/.env
           DB_USER=${{ secrets.DB_USER }}
           DB_PASS=${{ secrets.DB_PASS }}
