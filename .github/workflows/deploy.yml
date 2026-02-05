@@ -28,19 +28,30 @@ jobs:
           sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared hoa-web || true
           sudo /usr/bin/docker compose down --remove-orphans || true
 
-      - name: 🚀 Update Containers
+      - name: 🚀 Update Containers & Verify Secrets
+        env:
+          DB_USER_VAL: ${{ secrets.DB_USER }}
+          DB_PASS_VAL: ${{ secrets.DB_PASS }}
+          CF_TOKEN_VAL: ${{ secrets.CLOUDFLARE_TOKEN }}
         run: |
-          # 1. Create a local .env file from GitHub Secrets
-          # This ensures Docker Compose sees the variables even through sudo
-          echo "DB_USER=${{ secrets.DB_USER }}" > .env
-          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
-          echo "CLOUDFLARE_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}" >> .env
+          # 1. Length Verification (Check logs to see if these are > 0)
+          echo "Checking Secret Availability..."
+          echo "DB_USER length: ${#DB_USER_VAL}"
+          echo "DB_PASS length: ${#DB_PASS_VAL}"
+          echo "CLOUDFLARE_TOKEN length: ${#CF_TOKEN_VAL}"
           
-          # 2. Deploy (Docker Compose reads .env automatically)
-          sudo /usr/bin/docker compose up -d --build --force-recreate
+          # 2. Force create .env file with root authority
+          sudo /usr/bin/tee .env <<EOF
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASS=${{ secrets.DB_PASS }}
+          CLOUDFLARE_TOKEN=${{ secrets.CLOUDFLARE_TOKEN }}
+          EOF
           
-          # 3. Clean up the secret file immediately
-          rm .env
+          # 3. Deploy using explicit env-file and sudo preservation
+          sudo -E /usr/bin/docker compose --env-file .env up -d --build --force-recreate
+          
+          # 4. Immediate Security Cleanup
+          sudo /usr/bin/rm .env
 
       - name: 📉 Clean Up Storage
         run: sudo /usr/bin/docker image prune -f
