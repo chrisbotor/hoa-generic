@@ -1,6 +1,5 @@
-package com.yourname.hoa.resources;
-
-import com.yourname.hoa.entity.User;
+package com.hoa.portal.resource;
+import com.hoa.portal.entity.User;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
