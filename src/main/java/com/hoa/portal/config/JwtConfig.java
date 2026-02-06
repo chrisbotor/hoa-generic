@@ -13,8 +13,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Dependent
-@Alternative // Mark this as an alternative to the default Quarkus bean
-@Priority(Interceptor.Priority.APPLICATION + 10) // Give it higher priority
+@Alternative
+@Priority(Interceptor.Priority.APPLICATION + 10)
 public class JwtConfig {
 
     @Produces
@@ -24,6 +24,9 @@ public class JwtConfig {
         
         JWTAuthContextInfo contextInfo = new JWTAuthContextInfo();
         contextInfo.setIssuedBy("https://hoa-portal.com");
+        
+        // This is the new line to add:
+        contextInfo.setRelaxVerificationKeyValidation(true);
         
         SecretKeySpec key = new SecretKeySpec(
             secret.getBytes(StandardCharsets.UTF_8), 
