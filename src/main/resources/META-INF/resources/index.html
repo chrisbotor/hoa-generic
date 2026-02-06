@@ -45,7 +45,8 @@
             </div>
 
             <div id="request-list" class="grid gap-4">
-                </div>
+                <p class="text-gray-500 text-center py-10">Loading your requests...</p>
+            </div>
         </main>
     </div>
 
@@ -55,6 +56,10 @@
         async function login() {
             const email = document.getElementById('email').value;
             const passwordHash = document.getElementById('password').value;
+            const loginBtn = document.getElementById('login-btn');
+
+            loginBtn.disabled = true;
+            loginBtn.innerText = "Connecting...";
 
             try {
                 const res = await fetch(`${API_BASE}/auth/login`, {
@@ -69,10 +74,13 @@
                     localStorage.setItem('hoa_role', data.role);
                     showDashboard();
                 } else {
-                    alert('Invalid credentials');
+                    alert('Login failed. Please check your credentials.');
                 }
             } catch (err) {
-                alert('Connection error');
+                alert('Server unreachable. Check your Beelink connection.');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.innerText = "Sign In";
             }
         }
 
@@ -88,6 +96,8 @@
             const token = localStorage.getItem('hoa_token');
             const listContainer = document.getElementById('request-list');
 
+            if (!token) return;
+
             try {
                 const res = await fetch(`${API_BASE}/requests`, {
                     method: 'GET',
@@ -98,14 +108,15 @@
                 });
 
                 if (res.status === 401) {
+                    console.warn("Unauthorized request. Clearing session.");
                     logout();
                     return;
                 }
 
                 const requests = await res.json();
 
-                if (requests.length === 0) {
-                    listContainer.innerHTML = `<p class="text-gray-500 text-center py-10">No requests found.</p>`;
+                if (!requests || requests.length === 0) {
+                    listContainer.innerHTML = `<p class="text-gray-500 text-center py-10">No requests found in the system.</p>`;
                     return;
                 }
 
@@ -126,24 +137,24 @@
                 `).join('');
 
             } catch (err) {
-                listContainer.innerHTML = `<p class="text-red-500 text-center">Error loading data.</p>`;
+                listContainer.innerHTML = `<p class="text-red-500 text-center">Failed to load maintenance data.</p>`;
             }
         }
 
         function getStatusColor(status) {
-            switch(status?.toLowerCase()) {
-                case 'pending': return 'border-yellow-400';
-                case 'in_progress': return 'border-blue-400';
-                case 'completed': return 'border-green-400';
-                default: return 'border-gray-300';
-            }
+            const s = status?.toLowerCase();
+            if (s === 'pending') return 'border-yellow-400';
+            if (s === 'in_progress') return 'border-blue-400';
+            if (s === 'completed') return 'border-green-400';
+            return 'border-gray-300';
         }
 
         function logout() {
             localStorage.clear();
-            location.reload();
+            window.location.reload();
         }
 
+        // Initialize view based on existing session
         window.onload = () => {
             if (localStorage.getItem('hoa_token')) {
                 showDashboard();
