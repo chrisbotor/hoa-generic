@@ -1,5 +1,6 @@
 package com.hoa.portal.resource;
 
+import io.quarkus.security.Authenticated; // Add this import
 import com.hoa.portal.entity.MaintenanceRequest;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Path("/portal/requests")
+@Authenticated
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class MaintenanceRequestResource {
