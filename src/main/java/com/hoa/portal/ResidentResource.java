@@ -83,7 +83,7 @@ public class ResidentResource {
                 <body>
                     <nav class="navbar navbar-dark mb-4 p-3 shadow">
                         <div class="container d-flex justify-content-between">
-                            <span class="navbar-brand h1 mb-0">🏘️ HOA Generic-SS Portal</span>
+                            <span class="navbar-brand h1 mb-0">🏘️ HOA generic-SS Portal</span>
                             <button class="btn btn-light rounded-pill px-4 fw-bold" data-bs-toggle="modal" data-bs-target="#regModal">+ Add Resident</button>
                         </div>
                     </nav>
