@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOA Portal MVP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <div id="login-section" class="flex items-center justify-center min-h-screen">
+        <div class="bg-white p-8 rounded-lg shadow-md w-96">
+            <h2 class="text-2xl font-bold mb-6 text-center text-blue-600">HOA Login</h2>
+            <input type="email" id="email" placeholder="Email" class="w-full p-2 mb-4 border rounded" value="john@gmail.com">
+            <input type="password" id="password" placeholder="Password" class="w-full p-2 mb-4 border rounded" value="password123">
+            <button onclick="login()" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Login</button>
+        </div>
+    </div>
+
+    <div id="dashboard-section" class="hidden p-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold">Maintenance Requests</h1>
+            <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
+        </div>
+
+        <div id="request-list" class="grid gap-4">
+            </div>
+    </div>
+
+    <script>
+        const API_BASE = '/portal';
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const passwordHash = document.getElementById('password').value;
+
+            const res = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, passwordHash })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                localStorage.setItem('hoa_token', data.token);
+                localStorage.setItem('hoa_role', data.role);
+                showDashboard();
+            } else {
+                alert('Login failed!');
+            }
+        }
+
+        function showDashboard() {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('dashboard-section').classList.remove('hidden');
+            fetchRequests();
+        }
+
+        async function fetchRequests() {
+            const token = localStorage.getItem('hoa_token');
+            // For MVP, we'll point to a general list, but Hasura/Quarkus will filter by token
+            const res = await fetch(`${API_BASE}/requests`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const requests = await res.json();
+            
+            const list = document.getElementById('request-list');
+            list.innerHTML = requests.map(req => `
+                <div class="bg-white p-4 rounded shadow">
+                    <div class="flex justify-between">
+                        <h3 class="font-bold text-lg">${req.title}</h3>
+                        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">${req.status}</span>
+                    </div>
+                    <p class="text-gray-600">${req.description}</p>
+                </div>
+            `).join('');
+        }
+
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        // Auto-login check
+        if (localStorage.getItem('hoa_token')) showDashboard();
+    </script>
+</body>
+</html>
