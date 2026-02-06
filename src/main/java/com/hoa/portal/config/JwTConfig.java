@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 @Dependent
-public class JwtConfig {
+public class JwtConfig { 
 
     @Produces
     public JWTAuthContextInfo contextInfo() {
