@@ -3,8 +3,8 @@ package com.hoa.portal.entity;
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "maintenance_requests", schema = "hoa")
@@ -27,7 +27,7 @@ public class MaintenanceRequest extends PanacheEntityBase {
     @Column(name = "created_at")
     public LocalDateTime createdAt = LocalDateTime.now();
 
-    // Helper to find requests for a specific resident
+    // Helper to filter by resident ID
     public static List<MaintenanceRequest> findByResident(UUID residentId) {
         return list("requesterId", residentId);
     }
