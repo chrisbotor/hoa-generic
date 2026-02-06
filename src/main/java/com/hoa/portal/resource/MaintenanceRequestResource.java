@@ -20,6 +20,8 @@ public class MaintenanceRequestResource {
     @GET
     @RolesAllowed({"admin", "resident"})
     public List<MaintenanceRequest> getRequests() {
+        System.out.println("User: " + identity.getPrincipal().getName());
+        System.out.println("Roles: " + identity.getRoles());
         // 1. If Admin, return every request in the system
         if (identity.getRoles().contains("admin")) {
             return MaintenanceRequest.listAll();
