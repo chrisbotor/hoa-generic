@@ -23,7 +23,7 @@ public class JwtConfig {
         String secret = "my-super-secret-hoa-key-at-least-32-chars";
         
         JWTAuthContextInfo contextInfo = new JWTAuthContextInfo();
-        contextInfo.setIssuedBy("hoa-portal-mvp");
+        contextInfo.setIssuedBy("hoa-auth");
         
         // This is the new line to add:
         contextInfo.setRelaxVerificationKeyValidation(true);

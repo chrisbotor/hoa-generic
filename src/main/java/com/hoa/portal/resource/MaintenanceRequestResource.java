@@ -19,25 +19,24 @@ public class MaintenanceRequestResource {
     @Inject
     SecurityIdentity identity;
 
-    @GET
-    @RolesAllowed({"admin", "resident"})
-    public List<MaintenanceRequest> getRequests() {
-        System.out.println("User: " + identity.getPrincipal().getName());
-        System.out.println("Roles: " + identity.getRoles());
-        // 1. If Admin, return every request in the system
+@GET
+@RolesAllowed({"admin", "resident"})
+public List<MaintenanceRequest> getRequests() {
+    try {
         if (identity.getRoles().contains("admin")) {
             return MaintenanceRequest.listAll();
         }
         
-        // 2. If Resident, extract their UUID from the JWT claims
-        // Note: The claim name must match what we set in AuthResource
-        Object claim = identity.getAttributes().get("https://hasura.io/jwt/claims");
-        if (claim instanceof java.util.Map) {
-            java.util.Map<String, Object> claims = (java.util.Map<String, Object>) claim;
+        // Extract the claim safely
+        Map<String, Object> claims = identity.getAttribute("https://hasura.io/jwt/claims");
+        if (claims != null) {
             String userIdStr = (String) claims.get("x-hasura-user-id");
-            return MaintenanceRequest.findByResident(UUID.fromString(userIdStr));
+            return MaintenanceRequest.find("requesterId", UUID.fromString(userIdStr)).list();
         }
-
-        return List.of(); // Return empty if something is wrong with the token
+    } catch (Exception e) {
+        // This will print the actual error to your 'docker logs'
+        e.printStackTrace(); 
     }
+    return List.of();
+}
 }
