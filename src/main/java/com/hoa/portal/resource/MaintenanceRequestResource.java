@@ -7,9 +7,9 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.json.JsonObject; // Use Jakarta instead of Vert.x
 import java.util.List;
 import java.util.UUID;
-import io.vertx.core.json.JsonObject;
 
 @Path("/requests")
 @Produces(MediaType.APPLICATION_JSON)
@@ -20,7 +20,7 @@ public class MaintenanceRequestResource {
     SecurityIdentity identity;
 
     @Inject
-    JsonWebToken jwt; // Use the raw JWT for nested claims
+    JsonWebToken jwt;
 
     @GET
     @RolesAllowed({"admin", "resident"})
@@ -30,23 +30,25 @@ public class MaintenanceRequestResource {
         }
 
         try {
-            // 1. Get the nested Hasura claims object
+            // SmallRye JWT returns Jakarta JsonObject for nested claims
             JsonObject hasuraClaims = jwt.getClaim("https://hasura.io/jwt/claims");
             
             if (hasuraClaims != null) {
-                // 2. Extract the UUID string specifically
+                // Jakarta JsonObject uses getString()
                 String userIdStr = hasuraClaims.getString("x-hasura-user-id");
                 
-                if (userIdStr != null) {
-                    System.out.println("Success! Filtering for UUID: " + userIdStr);
+                if (userIdStr != null && !userIdStr.isEmpty()) {
+                    System.out.println("Success! Validated UUID from Claim: " + userIdStr);
                     return MaintenanceRequest.find("requesterId", UUID.fromString(userIdStr)).list();
                 }
             }
             
-            System.err.println("Claim x-hasura-user-id not found in token.");
+            System.err.println("Claim x-hasura-user-id was not found in the token.");
             
         } catch (Exception e) {
-            System.err.println("Security Error: " + e.getMessage());
+            // This will now catch and print the specific reason if it fails
+            System.err.println("Maintenance Resource Error: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return List.of();
