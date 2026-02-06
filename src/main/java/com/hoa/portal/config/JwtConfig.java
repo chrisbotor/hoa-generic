@@ -1,15 +1,17 @@
 package com.hoa.portal.config;
 
 import io.smallrye.jwt.auth.principal.JWTAuthContextInfo;
+import io.smallrye.jwt.algorithm.SignatureAlgorithm;
 import jakarta.enterprise.context.Dependent;
 import jakarta.enterprise.inject.Produces;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 @Dependent
-public class JwtConfig { 
+public class JwtConfig {
 
     @Produces
     public JWTAuthContextInfo contextInfo() {
@@ -25,7 +27,11 @@ public class JwtConfig {
             "HmacSHA256"
         );
         contextInfo.setSecretVerificationKey(key);
-        contextInfo.setSignatureAlgorithm(Collections.singleton("HS256"));
+
+        // Being extremely explicit with the type to avoid "incompatible bounds"
+        Set<SignatureAlgorithm> algs = new HashSet<SignatureAlgorithm>();
+        algs.add(SignatureAlgorithm.HS256);
+        contextInfo.setSignatureAlgorithm(algs);
         
         return contextInfo;
     }
