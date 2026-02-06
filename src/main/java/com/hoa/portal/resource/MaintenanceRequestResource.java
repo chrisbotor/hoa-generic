@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Path("/requests") // Root path /portal is handled by application.properties
+@Path("/requests")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class MaintenanceRequestResource {
@@ -21,32 +21,49 @@ public class MaintenanceRequestResource {
     @GET
     @RolesAllowed({"admin", "resident"})
     public List<MaintenanceRequest> getRequests() {
-        // Log the user for debugging in your Beelink terminal
-        System.out.println("Processing request for: " + identity.getPrincipal().getName());
-        System.out.println("User Roles: " + identity.getRoles());
+        // 1. Log the principal for Beelink terminal debugging
+        String principalName = identity.getPrincipal().getName();
+        System.out.println("Processing GET /requests for: " + principalName);
 
-        // 1. If the user is an Admin, show all community requests
+        // 2. Admin Role: Fetch all records without filtering
         if (identity.getRoles().contains("admin")) {
-            System.out.println("Role: Admin - Fetching all records");
+            System.out.println("Admin access: returning all community requests.");
             return MaintenanceRequest.listAll();
         }
-        
-        // 2. If a Resident, filter by their specific UUID stored in the JWT
+
+        // 3. Resident Role: Filter by the UUID inside the nested Hasura claims
         try {
-            // We pull the Hasura-style claims map we created in AuthResource
-            Map<String, Object> claims = identity.getAttribute("https://hasura.io/jwt/claims");
+            // Extract the map we saw in your JWT.io debug
+            Object claimsObj = identity.getAttribute("https://hasura.io/jwt/claims");
             
-            if (claims != null && claims.containsKey("x-hasura-user-id")) {
-                String userIdStr = (String) claims.get("x-hasura-user-id");
-                System.out.println("Role: Resident - Filtering for ID: " + userIdStr);
-                
-                return MaintenanceRequest.find("requesterId", UUID.fromString(userIdStr)).list();
+            String userIdStr = null;
+
+            if (claimsObj instanceof Map) {
+                Map<String, Object> claims = (Map<String, Object>) claimsObj;
+                userIdStr = (String) claims.get("x-hasura-user-id");
+            } 
+            
+            // Fallback: If map extraction fails, try using the principal name (often the 'sub')
+            if (userIdStr == null) {
+                userIdStr = principalName;
             }
+
+            if (userIdStr != null && !userIdStr.isEmpty()) {
+                System.out.println("Resident access: filtering for UUID " + userIdStr);
+                
+                // Ensure your Entity uses "requesterId" as the field name
+                return MaintenanceRequest.find("requesterId", UUID.fromString(userIdStr)).list();
+            } else {
+                System.err.println("Failed to identify User ID for resident: " + principalName);
+            }
+
+        } catch (IllegalArgumentException e) {
+            System.err.println("Invalid UUID format received: " + e.getMessage());
         } catch (Exception e) {
-            System.err.println("Error extracting claims: " + e.getMessage());
+            System.err.println("Database query error: " + e.getMessage());
+            e.printStackTrace();
         }
 
-        // Return empty list if no claims found or error occurs
         return List.of();
     }
-} 
+}
