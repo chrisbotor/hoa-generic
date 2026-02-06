@@ -27,6 +27,8 @@ public class AuthResource {
         // 1. Fetch user from the 'hoa.users' table
         User user = User.findByEmail(credentials.email);
 
+        System.out.println("DEBUG:  UUID is: " + user.id.toString());
+
         // 2. Simple password check (For MVP)
         if (user != null && user.passwordHash.equals(credentials.passwordHash)) {
             
