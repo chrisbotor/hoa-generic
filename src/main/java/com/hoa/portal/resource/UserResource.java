@@ -1,5 +1,7 @@
 package com.hoa.portal.resource;
 import com.hoa.portal.entity.User;
+
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
@@ -10,6 +12,7 @@ import java.util.List;
 public class UserResource {
 
     @GET
+    @RolesAllowed("admin") // Only Admin can see the full list of users
     public List<User> getAllUsers() {
         return User.listAll();
     }
