@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOA Portal MVP</title>
+    <title>HOA Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 font-sans">
@@ -45,23 +45,16 @@
             </div>
 
             <div id="request-list" class="grid gap-4">
-                <p class="text-gray-500 text-center py-10">Loading requests...</p>
-            </div>
+                </div>
         </main>
     </div>
 
     <script>
-        // Use relative path so it works across Cloudflare and Local IP
         const API_BASE = '/portal';
 
         async function login() {
             const email = document.getElementById('email').value;
             const passwordHash = document.getElementById('password').value;
-            const btn = document.getElementById('login-btn');
-
-            console.log("Attempting login for:", email);
-            btn.innerText = "Authenticating...";
-            btn.disabled = true;
 
             try {
                 const res = await fetch(`${API_BASE}/auth/login`, {
@@ -72,23 +65,14 @@
 
                 if (res.ok) {
                     const data = await res.json();
-                    console.log("Login Success! Token received.");
-                    
-                    // Save to local storage
                     localStorage.setItem('hoa_token', data.token);
                     localStorage.setItem('hoa_role', data.role);
-                    
                     showDashboard();
                 } else {
-                    console.error("Login failed with status:", res.status);
-                    alert('Invalid credentials or server error.');
+                    alert('Invalid credentials');
                 }
             } catch (err) {
-                console.error("Network Error:", err);
-                alert('Could not connect to the Beelink server.');
-            } finally {
-                btn.innerText = "Sign In";
-                btn.disabled = false;
+                alert('Connection error');
             }
         }
 
@@ -97,19 +81,12 @@
             document.getElementById('login-section').classList.add('hidden');
             document.getElementById('dashboard-section').classList.remove('hidden');
             document.getElementById('user-role-badge').innerText = role;
-            
             fetchRequests();
         }
 
         async function fetchRequests() {
             const token = localStorage.getItem('hoa_token');
             const listContainer = document.getElementById('request-list');
-
-            if (!token) {
-                console.error("No token found. Redirecting to login.");
-                logout();
-                return;
-            }
 
             try {
                 const res = await fetch(`${API_BASE}/requests`, {
@@ -121,12 +98,11 @@
                 });
 
                 if (res.status === 401) {
-                    listContainer.innerHTML = `<p class="text-red-500 text-center">Session expired. Please login again.</p>`;
+                    logout();
                     return;
                 }
 
                 const requests = await res.json();
-                console.log("Fetched requests:", requests);
 
                 if (requests.length === 0) {
                     listContainer.innerHTML = `<p class="text-gray-500 text-center py-10">No requests found.</p>`;
@@ -150,8 +126,7 @@
                 `).join('');
 
             } catch (err) {
-                console.error("Error fetching requests:", err);
-                listContainer.innerHTML = `<p class="text-red-500 text-center">Failed to load requests. Check console.</p>`;
+                listContainer.innerHTML = `<p class="text-red-500 text-center">Error loading data.</p>`;
             }
         }
 
@@ -169,7 +144,6 @@
             location.reload();
         }
 
-        // Auto-load dashboard if token exists
         window.onload = () => {
             if (localStorage.getItem('hoa_token')) {
                 showDashboard();
