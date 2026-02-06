@@ -56,9 +56,29 @@
             fetchRequests();
         }
 
-        async function fetchRequests() {
+       async function fetchRequests() {
             const token = localStorage.getItem('hoa_token');
-            // For MVP, we'll point to a general list, but Hasura/Quarkus will filter by token
+    
+            // Debug: Check if token exists in browser console
+            console.log("Using token:", token);
+
+            if (!token) {
+                console.error("No token found! User needs to login again.");
+                return;
+            }
+
+            const res = await fetch(`${API_BASE}/requests`, {
+                method: 'GET',
+                headers: { 
+                    'Authorization': `Bearer ${token}`, // Ensure no extra spaces or typos
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (res.status === 401) {
+                console.error("Server rejected the token (401).");
+                return;
+            }
             const res = await fetch(`${API_BASE}/requests`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
