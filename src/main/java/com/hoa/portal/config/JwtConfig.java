@@ -23,10 +23,11 @@ public class JwtConfig {
         String secret = "my-super-secret-hoa-key-at-least-32-chars";
         
         JWTAuthContextInfo contextInfo = new JWTAuthContextInfo();
-        contextInfo.setIssuedBy("https://hoa-portal.com");
+        contextInfo.setIssuedBy("hoa-portal-mvp");
         
         // This is the new line to add:
         contextInfo.setRelaxVerificationKeyValidation(true);
+        contextInfo.setExpGracePeriodSecs(60); // Allow 60 seconds of time difference
         
         SecretKeySpec key = new SecretKeySpec(
             secret.getBytes(StandardCharsets.UTF_8), 

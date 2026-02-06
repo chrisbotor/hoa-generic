@@ -37,7 +37,7 @@ public class AuthResource {
             );
 
             // 4. Build the JWT with Hasura-specific claims
-            String token = Jwt.issuer("https://hoa-portal.com")
+            String token = Jwt.issuer("hoa-portal-mvp")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
                 .claim("https://hasura.io/jwt/claims", new HashMap<String, Object>() {{

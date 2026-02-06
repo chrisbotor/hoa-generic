@@ -9,7 +9,7 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.HashMap;
 import java.util.Map;
 
-@Path("/portal/debug")
+@Path("/debug")
 public class DebugResource {
 
     @Inject
