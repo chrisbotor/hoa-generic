@@ -13,7 +13,7 @@ import java.util.HashSet;
 import java.util.Arrays;
 import java.util.HashMap;
 
-@Path("/portal/auth")
+@Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
