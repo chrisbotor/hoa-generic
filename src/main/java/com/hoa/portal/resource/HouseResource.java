@@ -12,7 +12,7 @@ import java.util.List;
 public class HouseResource {
 
     @GET
-    @RolesAllowed("admin") // Only admins need to see the full list
+    @RolesAllowed("admin")
     public List<House> getAllHouses() {
         return House.listAll();
     }

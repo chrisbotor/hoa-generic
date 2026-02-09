@@ -2,11 +2,20 @@ package com.hoa.portal.entity;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
+import java.util.UUID;
 
 @Entity
 @Table(name = "houses", schema = "hoa")
 public class House extends PanacheEntityBase {
     @Id
     public Integer id;
-    public String address; // Assuming you have an address column
+
+    @Column(name = "lot_number")
+    public String lotNumber;
+
+    @Column(name = "street_address")
+    public String streetAddress;
+
+    @Column(name = "owner_id")
+    public UUID ownerId;
 }
