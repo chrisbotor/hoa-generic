@@ -27,13 +27,19 @@ public class MaintenanceRequestResource {
     @GET
     @RolesAllowed({"admin", "resident"})
     public List<MaintenanceRequest> getRequests() {
+        // Admins see everything for management purposes
         if (identity.getRoles().contains("admin")) {
             return MaintenanceRequest.listAll();
         }
+        
         try {
             JsonObject claims = jwt.getClaim("https://hasura.io/jwt/claims");
-            String userId = claims.getString("x-hasura-user-id");
-            return MaintenanceRequest.find("requesterId", UUID.fromString(userId)).list();
+            int houseId = claims.getInt("x-hasura-house-id");
+
+            // STRICT FILTER: Only show requests belonging to this resident's house
+            // This includes requests made by the resident OR by the admin for this house
+            return MaintenanceRequest.find("houseId", houseId).list();
+            
         } catch (Exception e) {
             return List.of();
         }
@@ -48,12 +54,10 @@ public class MaintenanceRequestResource {
             request.requesterId = UUID.fromString(claims.getString("x-hasura-user-id"));
             
             if (identity.getRoles().contains("admin")) {
-                // If admin provided a houseId in the JSON body, use it; otherwise default to 0
-                if (request.houseId == null) {
-                    request.houseId = 0;
-                }
+                // If admin doesn't pick a house, default to 0 (Common Area)
+                if (request.houseId == null) request.houseId = 0;
             } else {
-                // Residents are strictly locked to their assigned house
+                // Resident is forced to their own house ID
                 request.houseId = claims.getInt("x-hasura-house-id");
             }
             
@@ -72,7 +76,7 @@ public class MaintenanceRequestResource {
     @Transactional
     public MaintenanceRequest updateStatus(@PathParam("id") Long id, MaintenanceRequest updateData) {
         MaintenanceRequest entity = MaintenanceRequest.findById(id);
-        if (entity == null) throw new NotFoundException("Request not found");
+        if (entity == null) throw new NotFoundException();
         if (updateData.status != null) entity.status = updateData.status;
         return entity;
     }
@@ -82,6 +86,6 @@ public class MaintenanceRequestResource {
     @RolesAllowed("admin")
     @Transactional
     public void deleteRequest(@PathParam("id") Long id) {
-        if (!MaintenanceRequest.deleteById(id)) throw new NotFoundException("Request not found");
+        if (!MaintenanceRequest.deleteById(id)) throw new NotFoundException();
     }
 }

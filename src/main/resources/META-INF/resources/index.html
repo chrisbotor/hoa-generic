@@ -33,8 +33,8 @@
         <main class="max-w-5xl mx-auto p-6">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h2 class="text-3xl font-bold text-gray-800">Maintenance Queue</h2>
-                    <p class="text-gray-500 text-sm mt-1">Manage and track community service requests.</p>
+                    <h2 class="text-3xl font-bold text-gray-800">My Property Queue</h2>
+                    <p class="text-gray-500 text-sm mt-1">Viewing maintenance tickets tagged to your property.</p>
                 </div>
                 <button onclick="toggleModal(true)" class="bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg hover:bg-green-700 transition font-bold transform hover:scale-105">
                     + New Ticket
@@ -47,23 +47,23 @@
     <div id="modal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
         <div class="bg-white p-8 rounded-2xl w-full max-w-md shadow-2xl">
             <h3 class="text-2xl font-bold mb-2 text-gray-800">Create Request</h3>
-            <p class="text-sm text-gray-500 mb-6">Provide details about the issue.</p>
+            <p class="text-sm text-gray-500 mb-6">Provide details for your property ticket.</p>
             
             <div class="space-y-4">
                 <div id="admin-house-selector" class="hidden">
-                    <label class="block text-xs font-black text-gray-400 uppercase mb-2">Location Assignment</label>
+                    <label class="block text-xs font-black text-gray-400 uppercase mb-2">Target Property</label>
                     <select id="new-house-id" class="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 font-medium focus:ring-2 focus:ring-blue-500 outline-none">
                         </select>
                 </div>
 
                 <div>
                     <label class="block text-xs font-black text-gray-400 uppercase mb-2">Subject</label>
-                    <input type="text" id="new-title" placeholder="e.g. Electrical Short Circuit" class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="text" id="new-title" placeholder="Summary of issue" class="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
 
                 <div>
                     <label class="block text-xs font-black text-gray-400 uppercase mb-2">Details</label>
-                    <textarea id="new-desc" placeholder="Describe the location and problem..." class="w-full p-3 border border-gray-200 rounded-xl h-32 focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
+                    <textarea id="new-desc" placeholder="Describe the problem..." class="w-full p-3 border border-gray-200 rounded-xl h-32 focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
                 </div>
             </div>
             
@@ -76,6 +76,7 @@
 
     <script>
         const API_BASE = '/portal';
+        let housesCache = []; 
 
         async function login() {
             const email = document.getElementById('email').value;
@@ -91,38 +92,36 @@
                     localStorage.setItem('hoa_token', data.token);
                     localStorage.setItem('hoa_role', data.role);
                     location.reload();
-                } else { alert("Login failed. Check your credentials."); }
-            } catch (e) { alert("Server connection error."); }
+                } else { alert("Login failed."); }
+            } catch (e) { alert("Connection error."); }
         }
 
         function logout() { localStorage.clear(); location.reload(); }
 
-        // Fetch houses dynamically from the database
         async function loadHouses() {
+            const role = localStorage.getItem('hoa_role');
             const selector = document.getElementById('new-house-id');
-            selector.innerHTML = '<option value="">Loading houses...</option>';
-            
+            if (role !== 'admin' && housesCache.length > 0) return; // Residents only need their house once
+
             try {
                 const res = await fetch(`${API_BASE}/houses`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('hoa_token')}` }
                 });
-                const houses = await res.json();
+                housesCache = await res.json();
                 
-                // Clear and add Default Option
-                selector.innerHTML = '<option value="0">📍 Common Area / General Admin</option>';
-                
-                // Append houses from DB
-                houses.forEach(house => {
-                    if (house.id !== 0) {
-                        const opt = document.createElement('option');
-                        opt.value = house.id;
-                        opt.innerText = `🏠 House #${house.id} ${house.address ? '- ' + house.address : ''}`;
-                        selector.appendChild(opt);
-                    }
-                });
+                if (role === 'admin') {
+                    selector.innerHTML = '<option value="0">📍 Common Area (Admin Only)</option>';
+                    housesCache.forEach(house => {
+                        if (house.id !== 0) {
+                            const opt = document.createElement('option');
+                            opt.value = house.id;
+                            opt.innerText = `🏠 Lot ${house.lotNumber} - ${house.streetAddress}`;
+                            selector.appendChild(opt);
+                        }
+                    });
+                }
             } catch (e) {
-                selector.innerHTML = '<option value="0">Error loading houses (Default to Common Area)</option>';
-                console.error("Fetch Houses Error:", e);
+                console.error("House load error", e);
             }
         }
 
@@ -135,8 +134,8 @@
                 modal.classList.remove('hidden');
                 if (role === 'admin') {
                     adminSelect.classList.remove('hidden');
-                    loadHouses(); // Fetch dynamic list when modal opens
                 }
+                loadHouses(); 
             } else {
                 modal.classList.add('hidden');
             }
@@ -144,6 +143,9 @@
 
         async function fetchRequests() {
             const role = localStorage.getItem('hoa_role');
+            // Ensure houses are in cache so labels work even for residents
+            if (housesCache.length === 0) await loadHouses();
+
             const res = await fetch(`${API_BASE}/requests`, {
                 headers: {'Authorization': `Bearer ${localStorage.getItem('hoa_token')}`}
             });
@@ -151,21 +153,28 @@
             const list = document.getElementById('request-list');
             
             const statusTheme = {
-                'pending': { border: 'border-yellow-400', badge: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-                'in_progress': { border: 'border-blue-500', badge: 'bg-blue-50 text-blue-700 border-blue-200' },
-                'completed': { border: 'border-green-500', badge: 'bg-green-50 text-green-700 border-green-200' }
+                'pending': { border: 'border-yellow-400', badge: 'bg-yellow-50 text-yellow-700' },
+                'in_progress': { border: 'border-blue-500', badge: 'bg-blue-50 text-blue-700' },
+                'completed': { border: 'border-green-500', badge: 'bg-green-50 text-green-700' }
             };
+
+            if (data.length === 0) {
+                list.innerHTML = `<p class="text-center text-gray-400 py-10">No active maintenance tickets for this property.</p>`;
+                return;
+            }
 
             list.innerHTML = data.map(req => {
                 const theme = statusTheme[req.status] || { border: 'border-gray-300', badge: 'bg-gray-50' };
-                const locLabel = req.houseId === 0 ? "Common Area" : `House #${req.houseId}`;
+                const houseInfo = housesCache.find(h => h.id === req.houseId);
+                const locLabel = req.houseId === 0 ? "Common Area" : 
+                                 (houseInfo ? `Lot ${houseInfo.lotNumber} - ${houseInfo.streetAddress}` : `My House`);
                 
                 return `
                 <div class="bg-white p-6 rounded-2xl shadow-sm border-l-8 ${theme.border} transition hover:shadow-md">
                     <div class="flex justify-between items-start">
                         <div class="flex-1">
-                            <div class="flex items-center gap-3 mb-2">
-                                <span class="text-[10px] bg-gray-100 px-2 py-1 rounded-md text-gray-500 font-black border border-gray-200 uppercase tracking-tighter">${locLabel}</span>
+                            <div class="flex flex-wrap items-center gap-3 mb-2">
+                                <span class="text-[10px] bg-gray-100 px-2 py-1 rounded-md text-gray-500 font-black border uppercase tracking-tighter">${locLabel}</span>
                                 <h4 class="font-bold text-xl text-gray-800">${req.title}</h4>
                             </div>
                             <p class="text-sm text-gray-600 leading-relaxed">${req.description}</p>
@@ -173,7 +182,7 @@
                         <div class="flex flex-col items-end gap-4 ml-6">
                             ${role === 'admin' ? `
                                 <div class="flex items-center gap-2">
-                                    <select onchange="updateStatus(${req.id}, this.value)" class="text-xs border border-gray-200 rounded-lg p-2 bg-white shadow-sm focus:ring-2 focus:ring-blue-400 outline-none">
+                                    <select onchange="updateStatus(${req.id}, this.value)" class="text-xs border rounded-lg p-2 bg-white shadow-sm focus:ring-2 focus:ring-blue-400 outline-none">
                                         <option value="pending" ${req.status === 'pending' ? 'selected' : ''}>Pending</option>
                                         <option value="in_progress" ${req.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
                                         <option value="completed" ${req.status === 'completed' ? 'selected' : ''}>Completed</option>
@@ -198,9 +207,9 @@
             const role = localStorage.getItem('hoa_role');
             const title = document.getElementById('new-title').value;
             const description = document.getElementById('new-desc').value;
-            const houseId = document.getElementById('new-house-id').value;
+            const houseId = document.getElementById('new-house-id')?.value;
 
-            if(!title || !description) return alert("All fields are required.");
+            if(!title || !description) return alert("Fill out all fields.");
 
             btn.disabled = true;
             btn.innerText = "Saving...";
@@ -238,7 +247,7 @@
         }
 
         async function deleteRequest(id) {
-            if (!confirm("Are you sure? This action is permanent.")) return;
+            if (!confirm("Delete permanently?")) return;
             await fetch(`${API_BASE}/requests/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('hoa_token')}` }
