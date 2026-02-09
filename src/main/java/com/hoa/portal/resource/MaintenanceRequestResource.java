@@ -45,42 +45,40 @@ public class MaintenanceRequestResource {
     public MaintenanceRequest createRequest(MaintenanceRequest request) {
         try {
             JsonObject claims = jwt.getClaim("https://hasura.io/jwt/claims");
-            
-            // Populate request from JWT claims to prevent data tampering
             request.requesterId = UUID.fromString(claims.getString("x-hasura-user-id"));
             request.houseId = claims.getInt("x-hasura-house-id");
-            
             request.status = "pending";
             request.createdAt = LocalDateTime.now();
-            
             request.persist();
             return request;
         } catch (Exception e) {
-            throw new WebApplicationException("Failed to create request: " + e.getMessage(), 400);
+            throw new WebApplicationException("Failed to create request", 400);
         }
     }
 
-    // Add this method to your existing Resource file
-
     @PATCH
     @Path("/{id}/status")
-    @RolesAllowed("admin") // ONLY admins can change status
+    @RolesAllowed("admin")
     @Transactional
     public MaintenanceRequest updateStatus(@PathParam("id") Long id, MaintenanceRequest updateData) {
-        // 1. Find the existing request in the hoa.maintenance_requests table
         MaintenanceRequest entity = MaintenanceRequest.findById(id);
-        
         if (entity == null) {
-            throw new NotFoundException("Request with ID " + id + " not found.");
+            throw new NotFoundException("Request not found");
         }
-
-        // 2. Update only the status field
         if (updateData.status != null) {
-            System.out.println("Updating Request #" + id + " to status: " + updateData.status);
             entity.status = updateData.status;
         }
-
-        // 3. Hibernate automatically saves changes because of @Transactional
         return entity;
+    }
+
+    @DELETE
+    @Path("/{id}")
+    @RolesAllowed("admin")
+    @Transactional
+    public void deleteRequest(@PathParam("id") Long id) {
+        boolean deleted = MaintenanceRequest.deleteById(id);
+        if (!deleted) {
+            throw new NotFoundException("Request not found");
+        }
     }
 }
