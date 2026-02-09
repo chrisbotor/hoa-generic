@@ -5,9 +5,10 @@ import io.quarkus.security.identity.SecurityIdentity;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.json.JsonObject; // Use Jakarta instead of Vert.x
+import jakarta.json.JsonObject;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,27 +31,38 @@ public class MaintenanceRequestResource {
         }
 
         try {
-            // SmallRye JWT returns Jakarta JsonObject for nested claims
             JsonObject hasuraClaims = jwt.getClaim("https://hasura.io/jwt/claims");
-            
             if (hasuraClaims != null) {
-                // Jakarta JsonObject uses getString()
                 String userIdStr = hasuraClaims.getString("x-hasura-user-id");
-                
-                if (userIdStr != null && !userIdStr.isEmpty()) {
-                    System.out.println("Success! Validated UUID from Claim: " + userIdStr);
-                    return MaintenanceRequest.find("requesterId", UUID.fromString(userIdStr)).list();
-                }
+                return MaintenanceRequest.find("requesterId", UUID.fromString(userIdStr)).list();
             }
-            
-            System.err.println("Claim x-hasura-user-id was not found in the token.");
-            
         } catch (Exception e) {
-            // This will now catch and print the specific reason if it fails
-            System.err.println("Maintenance Resource Error: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Read Error: " + e.getMessage());
         }
-
         return List.of();
+    }
+
+    @POST
+    @RolesAllowed({"admin", "resident"})
+    @Transactional
+    public MaintenanceRequest createRequest(MaintenanceRequest request) {
+        JsonObject hasuraClaims = jwt.getClaim("https://hasura.io/jwt/claims");
+        String userIdStr = hasuraClaims.getString("x-hasura-user-id");
+        
+        request.requesterId = UUID.fromString(userIdStr);
+        request.status = "pending";
+        request.persist();
+        return request;
+    }
+
+    @PATCH
+    @Path("/{id}/status")
+    @RolesAllowed("admin")
+    @Transactional
+    public MaintenanceRequest updateStatus(@PathParam("id") Long id, MaintenanceRequest update) {
+        MaintenanceRequest entity = MaintenanceRequest.findById(id);
+        if (entity == null) throw new NotFoundException();
+        entity.status = update.status;
+        return entity;
     }
 }
