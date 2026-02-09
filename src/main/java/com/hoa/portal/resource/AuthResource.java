@@ -8,8 +8,8 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.SecretKey; // Use SecretKey specifically
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +19,6 @@ import java.util.Map;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // This MUST match the secret in your JwtConfig.java exactly
     private final String secretString = "my-super-secret-hoa-key-at-least-32-chars";
 
     @POST
@@ -31,8 +30,8 @@ public class AuthResource {
             return Response.status(Response.Status.UNAUTHORIZED).build();
         }
 
-        // 1. Create the Signing Key correctly
-        Key key = new SecretKeySpec(
+        // 1. Create the SecretKeySpec and cast it correctly
+        SecretKey key = new SecretKeySpec(
             secretString.getBytes(StandardCharsets.UTF_8), 
             "HmacSHA256"
         );
@@ -43,7 +42,7 @@ public class AuthResource {
         hasuraClaims.put("x-hasura-user-id", user.id.toString());
         hasuraClaims.put("x-hasura-house-id", user.houseId);
 
-        // 2. Sign using the Key object, not the raw String
+        // 2. The sign method will now recognize the SecretKey type
         String token = Jwt.issuer("hoa-auth")
                 .upn(user.email)
                 .groups(user.role)
