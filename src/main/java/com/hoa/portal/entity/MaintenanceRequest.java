@@ -1,16 +1,18 @@
 package com.hoa.portal.entity;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase; // Change to Base
+import jakarta.persistence.*;
 import java.util.UUID;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "maintenance_requests", schema = "hoa")
-public class MaintenanceRequest extends PanacheEntity {
+public class MaintenanceRequest extends PanacheEntityBase { // Use Base for custom IDs
     
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // This tells Hibernate to use SERIAL/BIGSERIAL
+    public Long id;
+
     public String title;
     public String description;
     public String status;
