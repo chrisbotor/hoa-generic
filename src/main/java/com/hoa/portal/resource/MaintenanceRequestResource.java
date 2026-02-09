@@ -59,4 +59,28 @@ public class MaintenanceRequestResource {
             throw new WebApplicationException("Failed to create request: " + e.getMessage(), 400);
         }
     }
+
+    // Add this method to your existing Resource file
+
+    @PATCH
+    @Path("/{id}/status")
+    @RolesAllowed("admin") // ONLY admins can change status
+    @Transactional
+    public MaintenanceRequest updateStatus(@PathParam("id") Long id, MaintenanceRequest updateData) {
+        // 1. Find the existing request in the hoa.maintenance_requests table
+        MaintenanceRequest entity = MaintenanceRequest.findById(id);
+        
+        if (entity == null) {
+            throw new NotFoundException("Request with ID " + id + " not found.");
+        }
+
+        // 2. Update only the status field
+        if (updateData.status != null) {
+            System.out.println("Updating Request #" + id + " to status: " + updateData.status);
+            entity.status = updateData.status;
+        }
+
+        // 3. Hibernate automatically saves changes because of @Transactional
+        return entity;
+    }
 }
