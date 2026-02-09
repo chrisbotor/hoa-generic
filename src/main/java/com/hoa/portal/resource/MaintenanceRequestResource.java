@@ -45,15 +45,15 @@ public class MaintenanceRequestResource {
     public MaintenanceRequest createRequest(MaintenanceRequest request) {
         try {
             JsonObject claims = jwt.getClaim("https://hasura.io/jwt/claims");
-            
-            // Populate requester ID from token
             request.requesterId = UUID.fromString(claims.getString("x-hasura-user-id"));
             
-            // Role-based House ID Assignment
             if (identity.getRoles().contains("admin")) {
-                // Defaulting to 0 for Common Area/Admin tasks
-                request.houseId = 0; 
+                // If admin provided a houseId in the JSON body, use it; otherwise default to 0
+                if (request.houseId == null) {
+                    request.houseId = 0;
+                }
             } else {
+                // Residents are strictly locked to their assigned house
                 request.houseId = claims.getInt("x-hasura-house-id");
             }
             
@@ -62,7 +62,6 @@ public class MaintenanceRequestResource {
             request.persist();
             return request;
         } catch (Exception e) {
-            System.err.println("Post Error: " + e.getMessage());
             throw new WebApplicationException("Failed to create request", 400);
         }
     }
