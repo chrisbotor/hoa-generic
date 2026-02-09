@@ -53,11 +53,7 @@
                 <div id="admin-house-selector" class="hidden">
                     <label class="block text-xs font-black text-gray-400 uppercase mb-2">Location Assignment</label>
                     <select id="new-house-id" class="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 font-medium focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="0">📍 Common Area / General Admin</option>
-                        <option value="1">🏠 House #1</option>
-                        <option value="2">🏠 House #2</option>
-                        <option value="3">🏠 House #3</option>
-                    </select>
+                        </select>
                 </div>
 
                 <div>
@@ -101,6 +97,35 @@
 
         function logout() { localStorage.clear(); location.reload(); }
 
+        // Fetch houses dynamically from the database
+        async function loadHouses() {
+            const selector = document.getElementById('new-house-id');
+            selector.innerHTML = '<option value="">Loading houses...</option>';
+            
+            try {
+                const res = await fetch(`${API_BASE}/houses`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('hoa_token')}` }
+                });
+                const houses = await res.json();
+                
+                // Clear and add Default Option
+                selector.innerHTML = '<option value="0">📍 Common Area / General Admin</option>';
+                
+                // Append houses from DB
+                houses.forEach(house => {
+                    if (house.id !== 0) {
+                        const opt = document.createElement('option');
+                        opt.value = house.id;
+                        opt.innerText = `🏠 House #${house.id} ${house.address ? '- ' + house.address : ''}`;
+                        selector.appendChild(opt);
+                    }
+                });
+            } catch (e) {
+                selector.innerHTML = '<option value="0">Error loading houses (Default to Common Area)</option>';
+                console.error("Fetch Houses Error:", e);
+            }
+        }
+
         function toggleModal(show) {
             const modal = document.getElementById('modal');
             const adminSelect = document.getElementById('admin-house-selector');
@@ -108,7 +133,10 @@
 
             if (show) {
                 modal.classList.remove('hidden');
-                if (role === 'admin') adminSelect.classList.remove('hidden');
+                if (role === 'admin') {
+                    adminSelect.classList.remove('hidden');
+                    loadHouses(); // Fetch dynamic list when modal opens
+                }
             } else {
                 modal.classList.add('hidden');
             }
