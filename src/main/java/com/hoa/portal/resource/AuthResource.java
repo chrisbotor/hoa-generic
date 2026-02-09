@@ -16,19 +16,18 @@ import java.util.Map;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
+    // Same secret key used in your JwtConfig.java
     private final String key = "my-super-secret-hoa-key-at-least-32-chars";
 
     @POST
     @Path("/login")
     public Response login(AuthRequest credentials) {
-        // Look up the user in the .80 database
         User user = User.find("email", credentials.getEmail()).firstResult();
 
         if (user == null || !user.passwordHash.equals(credentials.getPasswordHash())) {
             return Response.status(Response.Status.UNAUTHORIZED).build();
         }
 
-        // Build Hasura-compatible claims dynamically
         Map<String, Object> hasuraClaims = new HashMap<>();
         hasuraClaims.put("x-hasura-default-role", user.role);
         hasuraClaims.put("x-hasura-allowed-roles", List.of(user.role));
