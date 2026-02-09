@@ -1,67 +1,46 @@
 package com.hoa.portal.resource;
 
 import com.hoa.portal.entity.User;
+import com.hoa.portal.model.AuthRequest;
+import com.hoa.portal.model.AuthResponse;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Must be at least 32 characters for HS256
-    private static final String SECRET = "my-super-secret-hoa-key-at-least-32-chars";
+    private final String key = "my-super-secret-hoa-key-at-least-32-chars";
 
     @POST
     @Path("/login")
-    public Response login(User credentials) {
-        // 1. Fetch user from the 'hoa.users' table
-        User user = User.findByEmail(credentials.email);
+    public Response login(AuthRequest credentials) {
+        // Look up the user in the .80 database
+        User user = User.find("email", credentials.getEmail()).firstResult();
 
-        System.out.println("DEBUG:  UUID is: " + user.id.toString());
+        if (user == null || !user.passwordHash.equals(credentials.getPasswordHash())) {
+            return Response.status(Response.Status.UNAUTHORIZED).build();
+        }
 
-        // 2. Simple password check (For MVP)
-        if (user != null && user.passwordHash.equals(credentials.passwordHash)) {
-            
-            // 3. Create the SecretKey explicitly to satisfy the compiler
-            SecretKey key = new SecretKeySpec(
-                SECRET.getBytes(StandardCharsets.UTF_8), 
-                "HmacSHA256"
-            );
+        // Build Hasura-compatible claims dynamically
+        Map<String, Object> hasuraClaims = new HashMap<>();
+        hasuraClaims.put("x-hasura-default-role", user.role);
+        hasuraClaims.put("x-hasura-allowed-roles", List.of(user.role));
+        hasuraClaims.put("x-hasura-user-id", user.id.toString());
+        hasuraClaims.put("x-hasura-house-id", user.houseId);
 
-            // 4. Build the JWT with Hasura-specific claims
-            String token = Jwt.issuer("hoa-auth")
+        String token = Jwt.issuer("hoa-auth")
                 .upn(user.email)
-                .groups(new HashSet<>(Arrays.asList(user.role)))
-                .claim("https://hasura.io/jwt/claims", new HashMap<String, Object>() {{
-                    put("x-hasura-default-role", user.role);
-                    put("x-hasura-allowed-roles", Arrays.asList("resident", "admin"));
-                    put("x-hasura-user-id", user.id.toString());
-                }})
-                .sign(key); // This now matches the sign(SecretKey) method
+                .groups(user.role)
+                .claim("https://hasura.io/jwt/claims", hasuraClaims)
+                .sign(key);
 
-            return Response.ok(new AuthResponse(token, user.role)).build();
-        }
-
-        // Return 401 if login fails
-        return Response.status(Response.Status.UNAUTHORIZED).build();
-    }
-
-    public static class AuthResponse {
-        public String token;
-        public String role;
-        public AuthResponse(String token, String role) {
-            this.token = token;
-            this.role = role;
-        }
+        return Response.ok(new AuthResponse(token, user.role)).build();
     }
 }

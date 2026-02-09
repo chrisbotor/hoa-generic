@@ -20,6 +20,9 @@ public class MaintenanceRequest extends PanacheEntityBase { // Use Base for cust
     @Column(name = "requester_id")
     public UUID requesterId;
 
+    @Column(name = "house_id")
+    public Integer houseId; // Add this field to match your DB column
+
     @Column(name = "created_at")
     public LocalDateTime createdAt = LocalDateTime.now();
 }

@@ -11,6 +11,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.json.JsonObject;
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 @Path("/requests")
 @Produces(MediaType.APPLICATION_JSON)
@@ -29,40 +30,33 @@ public class MaintenanceRequestResource {
         if (identity.getRoles().contains("admin")) {
             return MaintenanceRequest.listAll();
         }
-
         try {
-            JsonObject hasuraClaims = jwt.getClaim("https://hasura.io/jwt/claims");
-            if (hasuraClaims != null) {
-                String userIdStr = hasuraClaims.getString("x-hasura-user-id");
-                return MaintenanceRequest.find("requesterId", UUID.fromString(userIdStr)).list();
-            }
+            JsonObject claims = jwt.getClaim("https://hasura.io/jwt/claims");
+            String userId = claims.getString("x-hasura-user-id");
+            return MaintenanceRequest.find("requesterId", UUID.fromString(userId)).list();
         } catch (Exception e) {
-            System.err.println("Read Error: " + e.getMessage());
+            return List.of();
         }
-        return List.of();
     }
 
     @POST
     @RolesAllowed({"admin", "resident"})
     @Transactional
     public MaintenanceRequest createRequest(MaintenanceRequest request) {
-        JsonObject hasuraClaims = jwt.getClaim("https://hasura.io/jwt/claims");
-        String userIdStr = hasuraClaims.getString("x-hasura-user-id");
-        
-        request.requesterId = UUID.fromString(userIdStr);
-        request.status = "pending";
-        request.persist();
-        return request;
-    }
-
-    @PATCH
-    @Path("/{id}/status")
-    @RolesAllowed("admin")
-    @Transactional
-    public MaintenanceRequest updateStatus(@PathParam("id") Long id, MaintenanceRequest update) {
-        MaintenanceRequest entity = MaintenanceRequest.findById(id);
-        if (entity == null) throw new NotFoundException();
-        entity.status = update.status;
-        return entity;
+        try {
+            JsonObject claims = jwt.getClaim("https://hasura.io/jwt/claims");
+            
+            // Populate request from JWT claims to prevent data tampering
+            request.requesterId = UUID.fromString(claims.getString("x-hasura-user-id"));
+            request.houseId = claims.getInt("x-hasura-house-id");
+            
+            request.status = "pending";
+            request.createdAt = LocalDateTime.now();
+            
+            request.persist();
+            return request;
+        } catch (Exception e) {
+            throw new WebApplicationException("Failed to create request: " + e.getMessage(), 400);
+        }
     }
 }
