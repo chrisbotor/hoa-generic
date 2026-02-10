@@ -33,7 +33,7 @@ public class AuthResource {
                     "x-hasura-house-id", user.houseId != null ? user.houseId.toString() : "0"
                 ))
                 .expiresIn(28800)
-                .signWithSecret("my-super-secret-hoa-key-at-least-32-char!");
+                .signWithSecret("this-is-my-32-character-secret!!");
 
             // Explicitly return a Map that becomes the JSON object { "token": "..." }
             return Response.ok(Map.of("token", token)).build();

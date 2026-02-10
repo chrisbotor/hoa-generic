@@ -2,53 +2,71 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>HOA Portal - Debug Mode</title>
+    <title>HOA Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 p-8">
+    <div id="login-form" class="max-w-md mx-auto bg-white p-6 rounded shadow">
+        <h2 class="text-xl font-bold mb-4">Resident Login</h2>
+        <input type="text" id="email" placeholder="Email" class="w-full p-2 mb-2 border">
+        <input type="password" id="password" placeholder="Password" class="w-full p-2 mb-4 border">
+        <button onclick="login()" class="w-full bg-blue-600 text-white p-2 rounded">Login</button>
+    </div>
 
-    <div id="dashboard" class="max-w-4xl mx-auto bg-white p-6 rounded shadow">
-        <h1 class="text-2xl font-bold mb-4">Maintenance Requests</h1>
-        <div id="ticket-container" class="space-y-2">
-            <p class="text-gray-500 italic">Connecting to Beelink server...</p>
+    <div id="dashboard" class="hidden max-w-4xl mx-auto bg-white p-6 rounded shadow">
+        <div class="flex justify-between mb-4">
+            <h1 class="text-2xl font-bold">My Tickets</h1>
+            <button onclick="logout()" class="text-red-500 underline">Logout</button>
         </div>
-        <button onclick="loadTickets()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded">Refresh Data</button>
+        <div id="ticket-list" class="space-y-2">Loading...</div>
     </div>
 
     <script>
         const API = "http://192.168.100.81:8081/portal";
 
-        async function loadTickets() {
-            try {
-                const res = await fetch(`${API}/tickets`, {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                    // No Authorization header needed while @PermitAll is active
-                });
+        window.onload = () => {
+            if (localStorage.getItem('token')) showDashboard();
+        };
 
-                if (res.ok) {
-                    const data = await res.json();
-                    const container = document.getElementById('ticket-container');
-                    
-                    if (data.length === 0) {
-                        container.innerHTML = "<p>No tickets found in hoa.maintenance_requests table.</p>";
-                    } else {
-                        container.innerHTML = data.map(t => `
-                            <div class="p-3 bg-gray-50 border-l-4 border-blue-500 rounded">
-                                <strong>${t.title}</strong> - Status: ${t.status}
-                            </div>
-                        `).join('');
-                    }
-                } else {
-                    document.getElementById('ticket-container').innerText = "Error: Server returned " + res.status;
-                }
-            } catch (e) {
-                document.getElementById('ticket-container').innerText = "Connection failed. Is Quarkus running?";
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const res = await fetch(`${API}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, passwordHash: password })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                localStorage.setItem('token', data.token);
+                showDashboard();
+            } else { alert("Login failed"); }
+        }
+
+        async function showDashboard() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API}/tickets`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                const tickets = await res.json();
+                document.getElementById('ticket-list').innerHTML = tickets.map(t => `
+                    <div class="p-3 bg-gray-50 border-l-4 border-blue-500">${t.title} - ${t.status}</div>
+                `).join('');
+            } else if (res.status === 401) {
+                alert("Session expired. Please login again.");
+                logout();
             }
         }
 
-        // Load immediately on page open
-        loadTickets();
+        function logout() {
+            localStorage.removeItem('token');
+            location.reload();
+        }
     </script>
 </body>
 </html>
