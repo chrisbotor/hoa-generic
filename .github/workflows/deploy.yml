@@ -74,6 +74,11 @@ jobs:
               restart: always
           EOF
 
+          # Create the .env file with the actual values from GitHub Secrets
+          echo "DB_USER=${{ secrets.DB_USER }}" > .env
+          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+
           # 4. Deploy using fresh config
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
