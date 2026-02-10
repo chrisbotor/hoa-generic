@@ -3,7 +3,6 @@ package com.hoa.portal.resource;
 import com.hoa.portal.entity.User;
 import io.quarkus.elytron.security.common.BcryptUtil;
 import io.smallrye.jwt.build.Jwt;
-import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -19,17 +18,20 @@ public class AuthResource {
     @POST
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
-        // Fix for the NullPointerException: check if request or password is null
-        if (loginRequest == null || loginRequest.email == null || loginRequest.password == null) {
+        // Validation: match the 'passwordHash' field from your frontend JSON
+        if (loginRequest == null || loginRequest.email == null || loginRequest.passwordHash == null) {
             return Response.status(Response.Status.BAD_REQUEST)
-                           .entity(Map.of("error", "Email and password are required")).build();
+                           .entity(Map.of("error", "Email and passwordHash are required")).build();
         }
 
+        // 1. Find the user in the 'hoa' schema
         User user = User.find("email", loginRequest.email).firstResult();
 
-        // Ensure user exists AND has a hash stored before comparing
-        if (user != null && user.passwordHash != null && BcryptUtil.matches(loginRequest.password, user.passwordHash)) {
+        // 2. Verify existence and match Bcrypt hash
+        if (user != null && user.passwordHash != null && 
+            BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
+            // 3. Generate JWT with the hardcoded secret from your stable version
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -39,7 +41,7 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString(),
                     "x-hasura-house-id", user.houseId != null ? user.houseId.toString() : "0"
                 ))
-                .expiresIn(28800)
+                .expiresIn(28800) // 8 hours
                 .signWithSecret("my-super-secret-hoa-key-at-least-32-chars");
 
             return Response.ok(Map.of("token", token)).build();
@@ -49,8 +51,12 @@ public class AuthResource {
                        .entity(Map.of("error", "Invalid email or password")).build();
     }
 
+    /**
+     * Matches the JSON structure seen in your browser console:
+     * { "email": "...", "passwordHash": "..." }
+     */
     public static class LoginRequest {
         public String email;
-        public String password;
+        public String passwordHash; 
     }
 }
