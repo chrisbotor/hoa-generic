@@ -8,7 +8,8 @@ import java.util.UUID;
 @Table(name = "houses", schema = "hoa")
 public class House extends PanacheEntityBase {
     @Id
-    public Integer id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    public Long id;
 
     @Column(name = "lot_number")
     public String lotNumber;
@@ -17,5 +18,5 @@ public class House extends PanacheEntityBase {
     public String streetAddress;
 
     @Column(name = "owner_id")
-    public UUID ownerId; 
+    public java.util.UUID ownerId;
 }
