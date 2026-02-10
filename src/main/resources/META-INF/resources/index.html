@@ -90,23 +90,30 @@
 
         // --- NEW: Safe Fetch Logic to prevent SyntaxError ---
         async function authenticatedFetch(endpoint) {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                alert("No authentication token found. Please log in again.");
-                logout();
-                return null;
-            }
+    // HARDCODED TOKEN: Replace this with a token you copied from your 'login' console log
+    const hardcodedToken = "YOeyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2hvYS1wb3J0YWwuY29tIiwidXBuIjoiam9obkBnbWFpbC5jb20iLCJncm91cHMiOlsicmVzaWRlbnQiXSwiaHR0cHM6Ly9oYXN1cmEuaW8vand0L2NsYWltcyI6eyJ4LWhhc3VyYS11c2VyLWlkIjoiYjFlZWJjOTktOWMwYi00ZWY4LWJiNmQtNmJiOWJkMzgwYTIyIiwieC1oYXN1cmEtaG91c2UtaWQiOiIxIiwieC1oYXN1cmEtYWxsb3dlZC1yb2xlcyI6WyJyZXNpZGVudCJdLCJ4LWhhc3VyYS1kZWZhdWx0LXJvbGUiOiJyZXNpZGVudCJ9LCJpYXQiOjE3NzA3NDAzMzUsImV4cCI6MTc3MDc2OTEzNSwianRpIjoiM2JkZWU3YjgtYWQzZi00M2VlLWE4MGItZDcxZTdiMDM1YmE0In0.LoNKhrDcsZNyR7oYpSi4AiZzwya83YjO3Jqf0HYlNGw"; 
+    
+    console.log(`DEBUG: Testing ${endpoint} with hardcoded token.`);
 
-            const res = await fetch(`${API_BASE}/${endpoint}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (!res.ok) {
-                console.error(`Error fetching ${endpoint}:`, res.status, await res.text());
-                alert(`Failed to load ${endpoint}. Check console for details.`);
-                return null;
+    try {
+        const res = await fetch(`${API_BASE}/${endpoint}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${hardcodedToken}`,
+                'Content-Type': 'application/json'
             }
-    return res.json();
+        });
+
+        if (!res.ok) {
+            console.error(`DEBUG: Server still rejected hardcoded token. Status: ${res.status}`);
+            return null;
+        }
+
+        return await res.json();
+    } catch (e) {
+        console.error("Fetch error:", e);
+        return null;
+    }
 }
 
         async function loadDashboardData() {
