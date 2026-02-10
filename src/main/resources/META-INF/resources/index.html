@@ -91,36 +91,23 @@
         // --- NEW: Safe Fetch Logic to prevent SyntaxError ---
         async function authenticatedFetch(endpoint) {
             const token = localStorage.getItem('token');
-            if (!token) return null;
-
-            try {
-                const res = await fetch(`${API_BASE}/${endpoint}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                // Check status BEFORE calling .json()
-                if (res.status === 401) {
-                    console.error("401 Unauthorized: Redirecting to login.");
-                    alert("Server rejected the token. Check your Beelink logs for SRJWT errors.");
-                    //logout();
-                    return null;
-                }
-
-                if (!res.ok) {
-                    throw new Error(`Server returned ${res.status}`);
-                }
-
-                return await res.json();
-
-            } catch (e) {
-                console.error(`Fetch error for ${endpoint}:`, e);
+            if (!token) {
+                alert("No authentication token found. Please log in again.");
+                logout();
                 return null;
             }
-        }
+
+            const res = await fetch(`${API_BASE}/${endpoint}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!res.ok) {
+                console.error(`Error fetching ${endpoint}:`, res.status, await res.text());
+                alert(`Failed to load ${endpoint}. Check console for details.`);
+                return null;
+            }
+    return res.json();
+}
 
         async function loadDashboardData() {
             // Load Tickets
