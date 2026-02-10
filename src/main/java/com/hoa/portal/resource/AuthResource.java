@@ -36,7 +36,7 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800)
-                .signWithSecret(jwtSecret); // Matches the verification secret
+                .signWithSecret(jwtSecret.trim()); // Matches the verification secret
 
             return Response.ok(Map.of("token", token)).build();
         }
