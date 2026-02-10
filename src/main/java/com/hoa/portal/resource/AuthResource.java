@@ -18,9 +18,11 @@ public class AuthResource {
     @POST
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
+        // Find user by email in the hoa schema
         User user = User.find("email", loginRequest.email).firstResult();
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
+            // Generate the token
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -33,7 +35,8 @@ public class AuthResource {
                 .expiresIn(28800)
                 .signWithSecret("my-super-secret-hoa-key-at-least-32-chars");
 
-            return Response.ok(Map.of("token", token, "role", user.role)).build();
+            // Explicitly return a Map that becomes the JSON object { "token": "..." }
+            return Response.ok(Map.of("token", token)).build();
         }
         return Response.status(Response.Status.UNAUTHORIZED).build();
     }

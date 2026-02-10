@@ -2,122 +2,81 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOA Resident Portal</title>
+    <title>HOA Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 font-sans">
+<body class="bg-gray-100 p-10">
 
-    <div id="login-section" class="flex items-center justify-center min-h-screen">
-        <div class="bg-white p-8 rounded-lg shadow-md w-96">
-            <h2 class="text-2xl font-bold mb-6 text-center">Resident Login</h2>
-            <input type="email" id="email" placeholder="Email" class="w-full p-2 mb-4 border rounded">
-            <input type="password" id="password" placeholder="Password" class="w-full p-2 mb-6 border rounded">
-            <button onclick="login()" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Login</button>
-        </div>
+    <div id="login-form" class="max-w-md mx-auto bg-white p-8 rounded shadow">
+        <h2 class="text-2xl mb-4 font-bold">Resident Login</h2>
+        <input type="text" id="email" placeholder="Email" class="w-full p-2 mb-2 border">
+        <input type="password" id="password" placeholder="Password" class="w-full p-2 mb-4 border">
+        <button onclick="login()" class="w-full bg-blue-600 text-white p-2 rounded">Login</button>
     </div>
 
-    <div id="dashboard-section" class="hidden p-8">
-        <div class="flex justify-between items-center mb-8">
-            <h1 class="text-3xl font-bold text-gray-800">Welcome Home</h1>
-            <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h3 class="text-xl font-semibold mb-4 border-b pb-2">My Maintenance Tickets</h3>
-                <div id="tickets-list" class="space-y-3 text-gray-600 italic">Loading tickets...</div>
+    <div id="dashboard" class="hidden max-w-4xl mx-auto">
+        <h2 class="text-3xl font-bold mb-6">Your Dashboard</h2>
+        <div id="data-container" class="grid grid-cols-2 gap-4">
+            <div class="bg-white p-4 rounded shadow">
+                <h3 class="font-bold border-b mb-2">My Tickets</h3>
+                <div id="tickets">Loading...</div>
             </div>
-
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h3 class="text-xl font-semibold mb-4 border-b pb-2">My Property Details</h3>
-                <div id="property-details" class="text-gray-600 italic">Loading details...</div>
+            <div class="bg-white p-4 rounded shadow">
+                <h3 class="font-bold border-b mb-2">My Property</h3>
+                <div id="house">Loading...</div>
             </div>
         </div>
+        <button onclick="logout()" class="mt-4 text-red-600 underline">Logout</button>
     </div>
 
     <script>
-        // Update this to match your Beelink IP and Quarkus root-path
-        const API_BASE = "http://192.168.100.81:8081/portal";
+        const API = "http://192.168.100.81:8081/portal";
 
-        // 1. Initial State Check
-        window.onload = () => {
-            const token = localStorage.getItem('token');
-            if (token) {
-                document.getElementById('login-section').classList.add('hidden');
-                document.getElementById('dashboard-section').classList.remove('hidden');
-                loadDashboardData();
-            }
-        };
-
-        // 2. Login Function
         async function login() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-
+            
             try {
-                const res = await fetch(`${API_BASE}/auth/login`, {
+                const res = await fetch(`${API}/auth/login`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ email, passwordHash: password })
                 });
 
                 if (res.ok) {
                     const data = await res.json();
-                    localStorage.setItem('token', data.token); // Save JWT
-                    location.reload(); // Refresh to show dashboard
+                    if (data.token) {
+                        localStorage.setItem('token', data.token);
+                        showDashboard();
+                    }
                 } else {
-                    alert("Login failed. Check credentials.");
+                    alert("Login failed. Check Beelink logs.");
                 }
-            } catch (e) {
-                console.error("Login error:", e);
-                alert("Cannot connect to Beelink server.");
-            }
+            } catch (e) { console.error(e); }
         }
 
-        // 3. Authenticated Fetch Helper
-        async function authenticatedFetch(endpoint) {
+        async function showDashboard() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_BASE}/${endpoint}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+            const headers = { 'Authorization': `Bearer ${token}` };
+
+            // Fetch Tickets
+            const ticketRes = await fetch(`${API}/tickets`, { headers });
+            if (ticketRes.ok) {
+                const tickets = await ticketRes.json();
+                document.getElementById('tickets').innerHTML = tickets.length ? 
+                    tickets.map(t => `<p>• ${t.title} (${t.status})</p>`).join('') : "No tickets.";
+            }
+
+            // Fetch House
+            const houseRes = await fetch(`${API}/houses`, { headers });
+            if (houseRes.ok) {
+                const houses = await houseRes.json();
+                if (houses.length) {
+                    document.getElementById('house').innerHTML = `<p>${houses[0].streetAddress}</p><p>Lot ${houses[0].lotNumber}</p>`;
                 }
-            });
-
-            if (res.status === 401) {
-                logout();
-                return null;
-            }
-            return res.json();
-        }
-
-        // 4. Load Data
-        async function loadDashboardData() {
-            // Load Tickets
-            const tickets = await authenticatedFetch('tickets');
-            const ticketDiv = document.getElementById('tickets-list');
-            if (tickets && tickets.length > 0) {
-                ticketDiv.innerHTML = tickets.map(t => `
-                    <div class="p-3 bg-blue-50 rounded border-l-4 border-blue-500">
-                        <strong>${t.title}</strong> - <span class="text-sm">${t.status}</span>
-                    </div>
-                `).join('');
-            } else {
-                ticketDiv.innerText = "No tickets found for your house.";
-            }
-
-            // Load Houses (Filtered by Resident)
-            const houses = await authenticatedFetch('houses');
-            const houseDiv = document.getElementById('property-details');
-            if (houses && houses.length > 0) {
-                const h = houses[0]; // Resident likely has one house
-                houseDiv.innerHTML = `
-                    <p><strong>Address:</strong> ${h.streetAddress}</p>
-                    <p><strong>Lot:</strong> ${h.lotNumber}</p>
-                `;
-            } else {
-                houseDiv.innerText = "No property data available.";
             }
         }
 
@@ -125,6 +84,9 @@
             localStorage.removeItem('token');
             location.reload();
         }
+
+        // Auto-login if token exists
+        if (localStorage.getItem('token')) showDashboard();
     </script>
 </body>
 </html>
