@@ -17,5 +17,5 @@ public class House extends PanacheEntityBase {
     public String streetAddress;
 
     @Column(name = "owner_id")
-    public UUID ownerId;
+    public UUID ownerId; 
 }
