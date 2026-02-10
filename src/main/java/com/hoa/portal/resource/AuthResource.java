@@ -7,9 +7,10 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+
+// IMPORTANT: Use SecretKey for symmetric signing (HS256)
+import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import java.security.Key;
-import java.util.Base64;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Arrays;
@@ -30,12 +31,11 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // 1. Get raw bytes from the secret (we'll treat it as a raw string for simplicity)
+            // 1. Convert the secret string to raw bytes
             byte[] keyBytes = jwtSecret.trim().getBytes(StandardCharsets.UTF_8);
             
-            // 2. Create a proper HMAC SHA-256 Key object
-            // This ensures the signer uses the exact bits required for HS256
-            Key key = new SecretKeySpec(keyBytes, "HmacSHA256");
+            // 2. Explicitly define as SecretKey to satisfy the .sign() method
+            SecretKey key = new SecretKeySpec(keyBytes, "HmacSHA256");
 
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
@@ -46,7 +46,7 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800)
-                .sign(key); // Sign using the Key object instead of a string
+                .sign(key); // This will now compile correctly
 
             return Response.ok(Map.of("token", token)).build();
         }
