@@ -1,10 +1,9 @@
 package com.hoa.portal.resource;
 
 import com.hoa.portal.entity.User;
-import io.quarkus.elytron.security.common.BcryptUtil; // For password matching
+import io.quarkus.elytron.security.common.BcryptUtil;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -20,13 +19,17 @@ public class AuthResource {
     @POST
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
-        // 1. Find the user by email
+        // Fix for the NullPointerException: check if request or password is null
+        if (loginRequest == null || loginRequest.email == null || loginRequest.password == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                           .entity(Map.of("error", "Email and password are required")).build();
+        }
+
         User user = User.find("email", loginRequest.email).firstResult();
 
-        // 2. Verify user exists and Bcrypt password matches
-        if (user != null && BcryptUtil.matches(loginRequest.password, user.passwordHash)) {
+        // Ensure user exists AND has a hash stored before comparing
+        if (user != null && user.passwordHash != null && BcryptUtil.matches(loginRequest.password, user.passwordHash)) {
             
-            // 3. Generate the token with Hasura claims
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -36,13 +39,14 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString(),
                     "x-hasura-house-id", user.houseId != null ? user.houseId.toString() : "0"
                 ))
-                .expiresIn(28800) // 8 hours
+                .expiresIn(28800)
                 .signWithSecret("my-super-secret-hoa-key-at-least-32-chars");
 
             return Response.ok(Map.of("token", token)).build();
         }
 
-        return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid credentials").build();
+        return Response.status(Response.Status.UNAUTHORIZED)
+                       .entity(Map.of("error", "Invalid email or password")).build();
     }
 
     public static class LoginRequest {

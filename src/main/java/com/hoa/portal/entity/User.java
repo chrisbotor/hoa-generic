@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "users", schema = "hoa")
 public class User extends PanacheEntityBase {
-
     @Id
     public UUID id;
 
@@ -18,7 +17,7 @@ public class User extends PanacheEntityBase {
     public String email;
 
     @Column(name = "password_hash")
-    public String passwordHash; // This matches your DB column
+    public String passwordHash;
 
     public String role;
 
