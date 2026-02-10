@@ -9,6 +9,7 @@ import jakarta.ws.rs.core.Response;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Arrays;
+import java.util.Base64;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
@@ -19,6 +20,10 @@ public class AuthResource {
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
         // Find user by email in the hoa schema
+
+        String secretBase64 = "dGhpcy1pcy1teS0zMi1jaGFyYWN0ZXItc2VjcmV0ISE=";
+        byte[] secretBytes = Base64.getDecoder().decode(secretBase64);
+
         User user = User.find("email", loginRequest.email).firstResult();
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
