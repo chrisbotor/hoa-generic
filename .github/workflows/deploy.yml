@@ -60,6 +60,7 @@ jobs:
               environment:
                 - DB_USER=\${DB_USER}
                 - DB_PASS=\${DB_PASS}
+                - JWT_SECRET=\${JWT_SECRET}
               # Hardcoded LogManager and fixed path to the JAR
               command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar /deployments/$JAR_NAME
               ports:

@@ -3,44 +3,41 @@ package com.hoa.portal.resource;
 import com.hoa.portal.entity.User;
 import io.quarkus.elytron.security.common.BcryptUtil;
 import io.smallrye.jwt.build.Jwt;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Arrays;
-import java.util.Base64;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
+    // Pulls the secret injected by your deploy.yml
+    @ConfigProperty(name = "JWT_SECRET")
+    String jwtSecret;
+
     @POST
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
-        // Find user by email in the hoa schema
-
-        String secretBase64 = "dGhpcy1pcy1teS0zMi1jaGFyYWN0ZXItc2VjcmV0ISE=";
-        byte[] secretBytes = Base64.getDecoder().decode(secretBase64);
-
         User user = User.find("email", loginRequest.email).firstResult();
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
-            // Generate the token
+            // Generate the token using the dynamic secret
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
                 .claim("https://hasura.io/jwt/claims", Map.of(
                     "x-hasura-allowed-roles", Arrays.asList(user.role),
                     "x-hasura-default-role", user.role,
-                    "x-hasura-user-id", user.id.toString(),
-                    "x-hasura-house-id", user.houseId != null ? user.houseId.toString() : "0"
+                    "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800)
-                .signWithSecret("this-is-my-32-character-secret!!");
+                .signWithSecret(jwtSecret); // Matches the verification secret
 
-            // Explicitly return a Map that becomes the JSON object { "token": "..." }
             return Response.ok(Map.of("token", token)).build();
         }
         return Response.status(Response.Status.UNAUTHORIZED).build();
