@@ -40,6 +40,16 @@ public class AuthResource {
         System.out.println("DEBUG: User found: " + user.fullName + " (ID: " + user.id + ")");
         System.out.println("DEBUG: Stored Hash in DB: " + user.passwordHash);
 
+        // Inside your AuthResource.java login method:
+        System.out.println("DEBUG: Raw password length: " + loginRequest.passwordHash.length());
+        System.out.println("DEBUG: DB hash length: " + user.passwordHash.length());
+
+        // Check for spaces
+        if (loginRequest.passwordHash.contains(" ")) {
+            System.out.println("DEBUG: WARNING - Raw password contains a space!");
+        }
+
+
         // 3. Verify Bcrypt match
         boolean matches = BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash);
         System.out.println("DEBUG: Bcrypt matching result: " + matches);
