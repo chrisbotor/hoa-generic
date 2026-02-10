@@ -6,16 +6,22 @@ import java.util.UUID;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users", schema = "hoa")
+@Table(name = "users", schema = "hoa") // Directs to your 'hoa' schema
 public class User extends PanacheEntityBase {
+
     @Id
-    public UUID id;
+    public UUID id; // Matches the gen_random_uuid() from your SQL
 
     @Column(name = "full_name")
     public String fullName;
 
     public String email;
 
+    /**
+     * This @Column annotation is the "bridge." 
+     * It tells Java that the variable 'passwordHash' 
+     * maps to the 'password_hash' column in your DB.
+     */
     @Column(name = "password_hash")
     public String passwordHash;
 
