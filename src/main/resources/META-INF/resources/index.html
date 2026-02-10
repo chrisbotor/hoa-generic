@@ -105,7 +105,8 @@
                 // Check status BEFORE calling .json()
                 if (res.status === 401) {
                     console.error("401 Unauthorized: Redirecting to login.");
-                    logout();
+                    alert("Server rejected the token. Check your Beelink logs for SRJWT errors.");
+                    //logout();
                     return null;
                 }
 
