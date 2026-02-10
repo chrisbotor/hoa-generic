@@ -18,20 +18,33 @@ public class AuthResource {
     @POST
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
-        // Validation: match the 'passwordHash' field from your frontend JSON
+        // Log the incoming request details
+        System.out.println("DEBUG: Login attempt for email: " + loginRequest.email);
+        
         if (loginRequest == null || loginRequest.email == null || loginRequest.passwordHash == null) {
+            System.out.println("DEBUG: Failed - Missing email or passwordHash in payload.");
             return Response.status(Response.Status.BAD_REQUEST)
                            .entity(Map.of("error", "Email and passwordHash are required")).build();
         }
 
-        // 1. Find the user in the 'hoa' schema
+        // 1. Search for user in the 'hoa' schema
         User user = User.find("email", loginRequest.email).firstResult();
 
-        // 2. Verify existence and match Bcrypt hash
-        if (user != null && user.passwordHash != null && 
-            BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
-            
-            // 3. Generate JWT with the hardcoded secret from your stable version
+        if (user == null) {
+            System.out.println("DEBUG: Failed - User not found in database for email: " + loginRequest.email);
+            return Response.status(Response.Status.UNAUTHORIZED)
+                           .entity(Map.of("error", "Invalid credentials")).build();
+        }
+
+        // 2. Log found user and hash for verification
+        System.out.println("DEBUG: User found: " + user.fullName + " (ID: " + user.id + ")");
+        System.out.println("DEBUG: Stored Hash in DB: " + user.passwordHash);
+
+        // 3. Verify Bcrypt match
+        boolean matches = BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash);
+        System.out.println("DEBUG: Bcrypt matching result: " + matches);
+
+        if (matches) {
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -41,20 +54,18 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString(),
                     "x-hasura-house-id", user.houseId != null ? user.houseId.toString() : "0"
                 ))
-                .expiresIn(28800) // 8 hours
+                .expiresIn(28800) 
                 .signWithSecret("my-super-secret-hoa-key-at-least-32-chars");
 
+            System.out.println("DEBUG: Login Success - JWT Generated.");
             return Response.ok(Map.of("token", token)).build();
         }
 
+        System.out.println("DEBUG: Failed - Password mismatch for " + loginRequest.email);
         return Response.status(Response.Status.UNAUTHORIZED)
-                       .entity(Map.of("error", "Invalid email or password")).build();
+                       .entity(Map.of("error", "Invalid credentials")).build();
     }
 
-    /**
-     * Matches the JSON structure seen in your browser console:
-     * { "email": "...", "passwordHash": "..." }
-     */
     public static class LoginRequest {
         public String email;
         public String passwordHash; 
