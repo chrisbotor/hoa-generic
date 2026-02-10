@@ -18,40 +18,34 @@ public class AuthResource {
     @POST
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
-        // Log the incoming request details
         System.out.println("DEBUG: Login attempt for email: " + loginRequest.email);
         
         if (loginRequest == null || loginRequest.email == null || loginRequest.passwordHash == null) {
-            System.out.println("DEBUG: Failed - Missing email or passwordHash in payload.");
             return Response.status(Response.Status.BAD_REQUEST)
                            .entity(Map.of("error", "Email and passwordHash are required")).build();
         }
 
-        // 1. Search for user in the 'hoa' schema
+        // 1. Find user in the 'hoa' schema
         User user = User.find("email", loginRequest.email).firstResult();
 
         if (user == null) {
-            System.out.println("DEBUG: Failed - User not found in database for email: " + loginRequest.email);
-            return Response.status(Response.Status.UNAUTHORIZED)
-                           .entity(Map.of("error", "Invalid credentials")).build();
+            System.out.println("DEBUG: User NOT found for: " + loginRequest.email);
+            return Response.status(Response.Status.UNAUTHORIZED).build();
         }
 
-        // 2. Log found user and hash for verification
-        System.out.println("DEBUG: User found: " + user.fullName + " (ID: " + user.id + ")");
-        System.out.println("DEBUG: Stored Hash in DB: " + user.passwordHash);
+        // 2. Deep Debugging Lengths and Whitespace
+        String rawInput = loginRequest.passwordHash.trim();
+        String dbHash = user.passwordHash.trim();
+        
+        System.out.println("DEBUG: Raw Input Length (trimmed): " + rawInput.length());
+        System.out.println("DEBUG: DB Hash Length (trimmed): " + dbHash.length());
+        
+        // TEMPORARY GENERATOR: Use this to see what the app wants the hash to be
+        String expectedHash = BcryptUtil.bcryptHash(rawInput);
+        System.out.println("DEBUG: GENERATED HASH for '" + rawInput + "' is: " + expectedHash);
 
-        // Inside your AuthResource.java login method:
-        System.out.println("DEBUG: Raw password length: " + loginRequest.passwordHash.length());
-        System.out.println("DEBUG: DB hash length: " + user.passwordHash.length());
-
-        // Check for spaces
-        if (loginRequest.passwordHash.contains(" ")) {
-            System.out.println("DEBUG: WARNING - Raw password contains a space!");
-        }
-
-
-        // 3. Verify Bcrypt match
-        boolean matches = BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash);
+        // 3. Perform the match
+        boolean matches = BcryptUtil.matches(rawInput, dbHash);
         System.out.println("DEBUG: Bcrypt matching result: " + matches);
 
         if (matches) {
@@ -67,11 +61,9 @@ public class AuthResource {
                 .expiresIn(28800) 
                 .signWithSecret("my-super-secret-hoa-key-at-least-32-chars");
 
-            System.out.println("DEBUG: Login Success - JWT Generated.");
             return Response.ok(Map.of("token", token)).build();
         }
 
-        System.out.println("DEBUG: Failed - Password mismatch for " + loginRequest.email);
         return Response.status(Response.Status.UNAUTHORIZED)
                        .entity(Map.of("error", "Invalid credentials")).build();
     }
