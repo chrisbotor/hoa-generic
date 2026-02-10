@@ -10,13 +10,13 @@ import jakarta.ws.rs.core.Response;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Pulls the secret injected by your deploy.yml
     @ConfigProperty(name = "JWT_SECRET")
     String jwtSecret;
 
@@ -26,7 +26,10 @@ public class AuthResource {
         User user = User.find("email", loginRequest.email).firstResult();
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
-            // Generate the token using the dynamic secret
+            
+            // Convert Hex String to Byte Array to ensure 100% signature match
+            byte[] secretBytes = decodeHex(jwtSecret.trim());
+
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -36,11 +39,25 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800)
-                .signWithSecret(jwtSecret.trim()); // Matches the verification secret
+                // Use the raw bytes for signing
+                .signWithSecret(new String(secretBytes, StandardCharsets.UTF_8));
 
             return Response.ok(Map.of("token", token)).build();
         }
         return Response.status(Response.Status.UNAUTHORIZED).build();
+    }
+
+    /**
+     * Helper to convert Hex string from Environment Variable to byte array
+     */
+    private byte[] decodeHex(String hex) {
+        int len = hex.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
+                                 + Character.digit(hex.charAt(i+1), 16));
+        }
+        return data;
     }
 
     public static class LoginRequest {
