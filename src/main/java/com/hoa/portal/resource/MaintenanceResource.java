@@ -24,44 +24,30 @@ public class MaintenanceResource {
     @GET
     @RolesAllowed({"admin", "resident"})
     public List<MaintenanceRequest> getTickets() {
-        String username = identity.getPrincipal().getName();
-        System.out.println("DEBUG: Fetching tickets for user: " + username);
-
-        // 1. Check Roles
-        System.out.println("DEBUG: User roles: " + identity.getRoles());
+        // Log the user for debugging
+        System.out.println("DEBUG: Fetching tickets for user: " + identity.getPrincipal().getName());
 
         if (identity.getRoles().contains("admin")) {
-            System.out.println("DEBUG: Admin detected. Fetching ALL tickets.");
             return MaintenanceRequest.listAll();
         }
         
-        // 2. Extract House ID from JWT
+        // Extract the house-id claim we set in AuthResource
         try {
             JsonObject claims = jwt.getClaim("https://hasura.io/jwt/claims");
-            if (claims == null) {
-                System.out.println("DEBUG: FAILED - No Hasura claims found in JWT!");
-                return List.of();
+            String houseIdStr = claims.getString("x-hasura-user-id"); // Using user-id or house-id depending on your mapping
+            
+            // If you specifically need x-hasura-house-id:
+            if (claims.containsKey("x-hasura-house-id")) {
+                houseIdStr = claims.getString("x-hasura-house-id");
             }
 
-            String houseIdStr = claims.getString("x-hasura-house-id");
-            System.out.println("DEBUG: Extracted x-hasura-house-id from JWT: " + houseIdStr);
-
-            if (houseIdStr == null || houseIdStr.equals("0")) {
-                System.out.println("DEBUG: WARNING - House ID is 0 or null. No tickets will be found.");
-                return List.of();
-            }
-
+            System.out.println("DEBUG: Filtering for House ID: " + houseIdStr);
+            
             Long myHouseId = Long.parseLong(houseIdStr);
+            return MaintenanceRequest.find("houseId", myHouseId).list();
             
-            // 3. Query Database
-            List<MaintenanceRequest> tickets = MaintenanceRequest.find("houseId", myHouseId).list();
-            System.out.println("DEBUG: Database returned " + tickets.size() + " tickets for house_id " + myHouseId);
-            
-            return tickets;
-
         } catch (Exception e) {
-            System.out.println("DEBUG: ERROR during ticket retrieval: " + e.getMessage());
-            e.printStackTrace();
+            System.out.println("DEBUG: Error parsing JWT claims: " + e.getMessage());
             return List.of();
         }
     }
