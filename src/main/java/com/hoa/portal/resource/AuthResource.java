@@ -7,6 +7,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.Key;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Arrays;
@@ -27,8 +30,12 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // Convert Hex String to Byte Array to ensure 100% signature match
-            byte[] secretBytes = decodeHex(jwtSecret.trim());
+            // 1. Get raw bytes from the secret (we'll treat it as a raw string for simplicity)
+            byte[] keyBytes = jwtSecret.trim().getBytes(StandardCharsets.UTF_8);
+            
+            // 2. Create a proper HMAC SHA-256 Key object
+            // This ensures the signer uses the exact bits required for HS256
+            Key key = new SecretKeySpec(keyBytes, "HmacSHA256");
 
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
@@ -39,25 +46,11 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800)
-                // Use the raw bytes for signing
-                .signWithSecret(new String(secretBytes, StandardCharsets.UTF_8));
+                .sign(key); // Sign using the Key object instead of a string
 
             return Response.ok(Map.of("token", token)).build();
         }
         return Response.status(Response.Status.UNAUTHORIZED).build();
-    }
-
-    /**
-     * Helper to convert Hex string from Environment Variable to byte array
-     */
-    private byte[] decodeHex(String hex) {
-        int len = hex.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
-                                 + Character.digit(hex.charAt(i+1), 16));
-        }
-        return data;
     }
 
     public static class LoginRequest {
