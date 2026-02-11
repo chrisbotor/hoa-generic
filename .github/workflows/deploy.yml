@@ -41,14 +41,16 @@ jobs:
 
       - name: 🚀 Update Containers & Sync Config
         run: |
-          # 1. Create .env for database secrets
-          printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\n" > .env
+          # 1. Create the .env with only the Database secrets
+          echo "DB_USER=${{ secrets.DB_USER }}" > .env
+          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
           
-          # 2. Identify the specific runner jar file
+          # 2. Identify the jar file (essential for the command below)
           JAR_NAME=$(ls target/*-runner.jar | xargs basename)
-          echo "Building with JAR: $JAR_NAME"
 
-          # 3. Generate docker-compose.yml with the JAR filename injected directly
+          # 3. Generate docker-compose.yml 
+          # Note: We removed the Hasura environment lines here 
+          # because you have them hardcoded in application.properties
           cat << EOF > docker-compose.yml
           services:
             hoa-app:
@@ -60,8 +62,8 @@ jobs:
               environment:
                 - DB_USER=\${DB_USER}
                 - DB_PASS=\${DB_PASS}
-                - JWT_SECRET=\${JWT_SECRET}
-              # Hardcoded LogManager and fixed path to the JAR
+                # We removed HASURA and JWT_SECRET from here 
+                # because they are now hardcoded in your files for reliability
               command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar /deployments/$JAR_NAME
               ports:
                 - "8081:8080"
@@ -73,11 +75,6 @@ jobs:
               command: tunnel --url http://hoa-quarkus-app:8080
               restart: always
           EOF
-
-          # Create the .env file with the actual values from GitHub Secrets
-          echo "DB_USER=${{ secrets.DB_USER }}" > .env
-          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
 
           # 4. Deploy using fresh config
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
