@@ -16,7 +16,7 @@ import java.util.Arrays;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Hardcoded for synchronization test
+    // Hardcoded for absolute synchronization with application.properties
     private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
 
     @PostConstruct
@@ -29,10 +29,13 @@ public class AuthResource {
     @POST
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
+        // 1. Find the user
         User user = User.find("email", loginRequest.email).firstResult();
 
+        // 2. Bcrypt Check: matches(PlainTextFromUser, HashFromDatabase)
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
+            // 3. Generate Token
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)    
                 .subject(user.email)
@@ -47,11 +50,13 @@ public class AuthResource {
 
             return Response.ok(Map.of("token", token)).build();
         }
+        
+        // Fail if no match
         return Response.status(Response.Status.UNAUTHORIZED).build();
     }
 
     public static class LoginRequest {
         public String email;
-        public String passwordHash;
+        public String passwordHash; // This will receive the plain text "password123"
     }
 }
