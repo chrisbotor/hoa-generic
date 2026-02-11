@@ -16,7 +16,7 @@ import java.util.Arrays;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Exactly 32 characters (256 bits)
+    // Hardcoded for synchronization test
     private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
 
     @PostConstruct
@@ -33,10 +33,9 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // Generate the token
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)    
-                .subject(user.email) 
+                .subject(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
                 .claim("https://hasura.io/jwt/claims", Map.of(
                     "x-hasura-allowed-roles", Arrays.asList(user.role),
@@ -44,7 +43,6 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800) 
-                // Back to String to satisfy the Maven compiler
                 .signWithSecret(JWT_SECRET); 
 
             return Response.ok(Map.of("token", token)).build();
