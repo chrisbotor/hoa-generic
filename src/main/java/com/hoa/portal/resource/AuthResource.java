@@ -16,23 +16,13 @@ import java.util.Arrays;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Exactly 32 characters to satisfy the 256-bit requirement for HS256
+    // Exactly 32 characters for HS256 (256 bits)
     private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
 
-    /**
-     * This method runs as soon as the application starts.
-     * Use this to check the logs and confirm if the 32nd character is being read.
-     */
     @PostConstruct
-    public void debugSecretOnStartup() {
-        int length = JWT_SECRET.length();
+    public void debugSecret() {
         System.out.println("========================================");
-        System.out.println("DEBUG: JWT_SECRET length: " + length);
-        if (length < 32) {
-            System.err.println("ERROR: Key is ONLY " + (length * 8) + " bits. Needs 256!");
-        } else {
-            System.out.println("SUCCESS: Key is " + (length * 8) + " bits.");
-        }
+        System.out.println("DEBUG: JWT_SECRET length: " + JWT_SECRET.length());
         System.out.println("========================================");
     }
 
@@ -43,7 +33,7 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // Generate the token using the verified secret
+            // Generate the token
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -53,7 +43,7 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800) 
-                .signWithSecret(JWT_SECRET); 
+                .signWithSecret(JWT_SECRET); // SmallRye handles the string-to-bytes internally
 
             return Response.ok(Map.of("token", token)).build();
         }
