@@ -7,6 +7,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.annotation.PostConstruct;
+import java.nio.charset.StandardCharsets; // Added for explicit encoding
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Arrays;
@@ -16,6 +17,7 @@ import java.util.Arrays;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
+    // Exactly 32 characters (256 bits)
     private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
 
     @PostConstruct
@@ -28,13 +30,17 @@ public class AuthResource {
     @POST
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
+        // Log the attempt for easier debugging in Docker logs
+        System.out.println("DEBUG: Login attempt for email: " + loginRequest.email);
+        
         User user = User.find("email", loginRequest.email).firstResult();
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
+            // Generate the token with explicit UTF-8 bytes to match the RAW property
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)    
-                .subject(user.email) // Explicitly set subject as backup for UPN
+                .subject(user.email) 
                 .groups(new HashSet<>(Arrays.asList(user.role)))
                 .claim("https://hasura.io/jwt/claims", Map.of(
                     "x-hasura-allowed-roles", Arrays.asList(user.role),
@@ -42,10 +48,13 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800) 
-                .signWithSecret(JWT_SECRET); 
+                // CRITICAL CHANGE: Use .getBytes(StandardCharsets.UTF_8)
+                .signWithSecret(JWT_SECRET.getBytes(StandardCharsets.UTF_8)); 
 
             return Response.ok(Map.of("token", token)).build();
         }
+        
+        System.out.println("DEBUG: Login failed for user: " + loginRequest.email);
         return Response.status(Response.Status.UNAUTHORIZED).build();
     }
 
