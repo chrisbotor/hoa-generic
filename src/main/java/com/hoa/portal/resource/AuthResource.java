@@ -16,7 +16,7 @@ import java.util.Arrays;
 public class AuthResource {
 
     // Exactly 31 characters (Quarkus handles the bits internally)
-    private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026";
+    private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
 
     @POST
     @Path("/login")
