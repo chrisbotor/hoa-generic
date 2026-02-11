@@ -15,7 +15,7 @@ import java.util.Arrays;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Exactly 32 characters for HS256
+    // Exactly 32 characters: HS256 requires this length
     private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
 
     @POST
@@ -25,7 +25,7 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // Pass the String directly to avoid the "incompatible types" error
+            // Sign with the String directly to satisfy the Maven compiler
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -34,7 +34,7 @@ public class AuthResource {
                     "x-hasura-default-role", user.role,
                     "x-hasura-user-id", user.id.toString()
                 ))
-                .expiresIn(28800)
+                .expiresIn(28800) 
                 .signWithSecret(JWT_SECRET); 
 
             return Response.ok(Map.of("token", token)).build();
