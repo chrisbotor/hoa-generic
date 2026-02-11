@@ -6,6 +6,7 @@ import io.smallrye.jwt.build.Jwt;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.annotation.PostConstruct;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Arrays;
@@ -15,8 +16,25 @@ import java.util.Arrays;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Exactly 31 characters (Quarkus handles the bits internally)
+    // Exactly 32 characters to satisfy the 256-bit requirement for HS256
     private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
+
+    /**
+     * This method runs as soon as the application starts.
+     * Use this to check the logs and confirm if the 32nd character is being read.
+     */
+    @PostConstruct
+    public void debugSecretOnStartup() {
+        int length = JWT_SECRET.length();
+        System.out.println("========================================");
+        System.out.println("DEBUG: JWT_SECRET length: " + length);
+        if (length < 32) {
+            System.err.println("ERROR: Key is ONLY " + (length * 8) + " bits. Needs 256!");
+        } else {
+            System.out.println("SUCCESS: Key is " + (length * 8) + " bits.");
+        }
+        System.out.println("========================================");
+    }
 
     @POST
     @Path("/login")
@@ -25,7 +43,7 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // Generate the token
+            // Generate the token using the verified secret
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
