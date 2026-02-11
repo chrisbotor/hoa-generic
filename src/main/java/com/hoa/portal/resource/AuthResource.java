@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Exactly 32 characters for HS256 (256 bits)
+    // Exactly 32 characters for HS256
     private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
 
     @POST
@@ -26,7 +26,7 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // Generate token using explicit UTF-8 bytes to prevent encoding mismatches
+            // Sign using explicit UTF-8 bytes to match properties loader
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -35,12 +35,11 @@ public class AuthResource {
                     "x-hasura-default-role", user.role,
                     "x-hasura-user-id", user.id.toString()
                 ))
-                .expiresIn(28800) // 8 hours
+                .expiresIn(28800)
                 .signWithSecret(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
 
             return Response.ok(Map.of("token", token)).build();
         }
-        
         return Response.status(Response.Status.UNAUTHORIZED).build();
     }
 
