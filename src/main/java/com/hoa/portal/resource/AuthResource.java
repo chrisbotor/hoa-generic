@@ -9,7 +9,6 @@ import jakarta.ws.rs.core.Response;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Arrays;
-import java.nio.charset.StandardCharsets;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
@@ -26,7 +25,7 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // Sign using explicit UTF-8 bytes to match properties loader
+            // Pass the String directly to avoid the "incompatible types" error
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -36,7 +35,7 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800)
-                .signWithSecret(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+                .signWithSecret(JWT_SECRET); 
 
             return Response.ok(Map.of("token", token)).build();
         }
