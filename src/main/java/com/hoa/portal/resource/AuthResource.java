@@ -6,30 +6,29 @@ import io.smallrye.jwt.build.Jwt;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.util.Base64;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Arrays;
-import java.nio.charset.StandardCharsets;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Base64 for: "this-is-a-32-char-secret-key-123"
-    private static final String BASE64_SECRET = "dGhpcy1pcy1hLTMyLWNoYXItc2VjcmV0LWtleS0xMjM=";
+    // Simple, alpha-numeric string to avoid encoding issues.
+    // Ensure this matches application.properties exactly.
+    private static final String JWT_SECRET = "ThisIsMy32CharSecretKeyForHOA2026";
 
     @POST
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
+        // Find user by email in the database
         User user = User.find("email", loginRequest.email).firstResult();
 
+        // Verify user exists and Bcrypt password matches
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // Decode Base64 to get the actual bytes for the HMAC-SHA256 signature
-            byte[] keyBytes = Base64.getDecoder().decode(BASE64_SECRET);
-
+            // Generate the JWT with Hasura-compatible claims
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -38,12 +37,13 @@ public class AuthResource {
                     "x-hasura-default-role", user.role,
                     "x-hasura-user-id", user.id.toString()
                 ))
-                .expiresIn(28800)
-                // Passing the decoded bytes directly ensures a match with Quarkus properties
-                .signWithSecret(new String(keyBytes, StandardCharsets.UTF_8));
+                .expiresIn(28800) // 8 hours
+                .signWithSecret(JWT_SECRET);
 
             return Response.ok(Map.of("token", token)).build();
         }
+        
+        // Return 401 if login fails
         return Response.status(Response.Status.UNAUTHORIZED).build();
     }
 
