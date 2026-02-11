@@ -11,7 +11,6 @@ jobs:
 
     steps:
       - name: 🛡️ Force Cleanup Permissions
-        # Solves "EACCES: permission denied" by reclaiming ownership of target
         run: |
           if [ -d "target" ]; then
             sudo chown -R $USER:$USER target
@@ -31,24 +30,25 @@ jobs:
         run: ./mvnw clean package -U -DskipTests
 
       - name: 🛡️ Fix Build Permissions
-        # Solves "Unable to access jarfile" by ensuring Docker can read the file
         run: sudo chmod -R 777 target/
 
       - name: 🗑️ Clear Container Conflicts
-        # Prevents "Conflict: Container name already in use"
         run: |
           sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
 
       - name: 🚀 Update Containers & Sync Config
         run: |
-          # 1. Create .env for database secrets
-          printf "DB_USER=${{ secrets.DB_USER }}\nDB_PASS=${{ secrets.DB_PASS }}\nHASURA_URL=http://192.168.100.80:8080/v1/graphql\nHASURA_ADMIN_SECRET=${{ secrets.HASURA_SECRET }}\n" > .env
+          # 1. Create a single .env file for secrets
+          echo "DB_USER=${{ secrets.DB_USER }}" > .env
+          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "HASURA_SECRET=${{ secrets.HASURA_SECRET }}" >> .env
           
           # 2. Identify the specific runner jar file
           JAR_NAME=$(ls target/*-runner.jar | xargs basename)
           echo "Building with JAR: $JAR_NAME"
 
-          # 3. Generate docker-compose.yml with the JAR filename injected directly
+          # 3. Generate docker-compose.yml with explicit JWT mapping
           cat << EOF > docker-compose.yml
           services:
             hoa-app:
@@ -61,7 +61,10 @@ jobs:
                 - DB_USER=\${DB_USER}
                 - DB_PASS=\${DB_PASS}
                 - JWT_SECRET=\${JWT_SECRET}
-              # Hardcoded LogManager and fixed path to the JAR
+                # Force Quarkus to map the env var to the SmallRye config
+                - SMALLRYE_JWT_VERIFY_KEY=\${JWT_SECRET}
+                - SMALLRYE_JWT_VERIFY_KEY_FORMAT=RAW
+                - MP_JWT_VERIFY_ISSUER=https://hoa-portal.com
               command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar /deployments/$JAR_NAME
               ports:
                 - "8081:8080"
@@ -74,15 +77,10 @@ jobs:
               restart: always
           EOF
 
-          # Create the .env file with the actual values from GitHub Secrets
-          echo "DB_USER=${{ secrets.DB_USER }}" > .env
-          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-
           # 4. Deploy using fresh config
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
-          # 5. Cleanup temporary storage
+          # 5. Cleanup
           rm .env
           sudo /usr/bin/docker image prune -f
 
@@ -92,7 +90,7 @@ jobs:
           sleep 20
           echo "------------------------------------------------"
           echo "ACCESS YOUR PORTAL AT THE LINK BELOW:"
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet. Check logs manually."
+          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet."
           echo "------------------------------------------------"
 
       - name: 🛡️ Post-Deployment Ownership Reset
