@@ -17,7 +17,7 @@ public class AuthResource {
 
     // Simple, alpha-numeric string to avoid encoding issues.
     // Ensure this matches application.properties exactly.
-    private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026";
+    private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
 
     @POST
     @Path("/login")
