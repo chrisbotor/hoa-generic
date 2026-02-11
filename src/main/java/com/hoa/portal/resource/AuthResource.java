@@ -16,10 +16,8 @@ import java.util.Arrays;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Pulls from System Env (set by Docker) fallback to hardcoded for local dev
-    private static final String JWT_SECRET = System.getenv("JWT_SECRET") != null 
-        ? System.getenv("JWT_SECRET") 
-        : "StationBeelinkSer5ProHOAKey2026!";
+    // Exactly 32 characters (256 bits)
+    private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
 
     @PostConstruct
     public void debugSecret() {
@@ -35,6 +33,7 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
+            // Generate the token
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)    
                 .subject(user.email) 
@@ -45,6 +44,7 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800) 
+                // Back to String to satisfy the Maven compiler
                 .signWithSecret(JWT_SECRET); 
 
             return Response.ok(Map.of("token", token)).build();
