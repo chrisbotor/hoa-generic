@@ -33,8 +33,8 @@ public class AuthResource {
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
             String token = Jwt.issuer("https://hoa-portal.com")
+                .upn(user.email)    
                 .subject(user.email) // Explicitly set subject as backup for UPN
-                .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
                 .claim("https://hasura.io/jwt/claims", Map.of(
                     "x-hasura-allowed-roles", Arrays.asList(user.role),
