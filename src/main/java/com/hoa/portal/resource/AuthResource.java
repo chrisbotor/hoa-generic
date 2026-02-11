@@ -16,7 +16,6 @@ import java.util.Arrays;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Exactly 32 characters for HS256 (256 bits)
     private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
 
     @PostConstruct
@@ -33,8 +32,8 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // Generate the token
             String token = Jwt.issuer("https://hoa-portal.com")
+                .subject(user.email) // Explicitly set subject as backup for UPN
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
                 .claim("https://hasura.io/jwt/claims", Map.of(
@@ -43,7 +42,7 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800) 
-                .signWithSecret(JWT_SECRET); // SmallRye handles the string-to-bytes internally
+                .signWithSecret(JWT_SECRET); 
 
             return Response.ok(Map.of("token", token)).build();
         }
