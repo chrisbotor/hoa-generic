@@ -17,8 +17,9 @@ import java.util.Arrays;
 public class AuthResource {
 
     // Pulls the secret from your Beelink's environment variables
-    @ConfigProperty(name = "JWT_SECRET")
-    String jwtSecret;
+    //@ConfigProperty(name = "JWT_SECRET")
+    //String jwtSecret;
+    String jwtSecret = "ThisIsMySecure32CharacterSecretKey";
 
     @POST
     @Path("/login")
