@@ -15,8 +15,8 @@ import java.util.Arrays;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Exactly 32 characters: HS256 requires this length
-    private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026!";
+    // Exactly 31 characters (Quarkus handles the bits internally)
+    private static final String JWT_SECRET = "StationBeelinkSer5ProHOAKey2026";
 
     @POST
     @Path("/login")
@@ -25,7 +25,7 @@ public class AuthResource {
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // Sign with the String directly to satisfy the Maven compiler
+            // Generate the token
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
