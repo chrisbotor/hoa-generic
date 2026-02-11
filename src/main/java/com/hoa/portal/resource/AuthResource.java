@@ -7,36 +7,29 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-
-// IMPORTANT: Use SecretKey for symmetric signing (HS256)
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Arrays;
-import java.nio.charset.StandardCharsets;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
+    // Pulls the secret from your Beelink's environment variables
     @ConfigProperty(name = "JWT_SECRET")
     String jwtSecret;
 
     @POST
     @Path("/login")
     public Response login(LoginRequest loginRequest) {
+        // Look up user in the 'hoa' schema
         User user = User.find("email", loginRequest.email).firstResult();
 
         if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
             
-            // 1. Convert the secret string to raw bytes
-            byte[] keyBytes = jwtSecret.trim().getBytes(StandardCharsets.UTF_8);
-            
-            // 2. Explicitly define as SecretKey to satisfy the .sign() method
-            SecretKey key = new SecretKeySpec(keyBytes, "HmacSHA256");
-
+            // Generate the token
+            // .trim() is essential to remove hidden newlines from Docker/Env injection
             String token = Jwt.issuer("https://hoa-portal.com")
                 .upn(user.email)
                 .groups(new HashSet<>(Arrays.asList(user.role)))
@@ -45,11 +38,12 @@ public class AuthResource {
                     "x-hasura-default-role", user.role,
                     "x-hasura-user-id", user.id.toString()
                 ))
-                .expiresIn(28800)
-                .sign(key); // This will now compile correctly
+                .expiresIn(28800) 
+                .signWithSecret(jwtSecret.trim()); // Signs as a RAW string to match properties
 
             return Response.ok(Map.of("token", token)).build();
         }
+        
         return Response.status(Response.Status.UNAUTHORIZED).build();
     }
 
