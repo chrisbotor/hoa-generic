@@ -71,10 +71,7 @@ jobs:
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
           # 4. Cleanup
-          rm .env
-
-          # 5. Cleanup
-          rm .env
+          rm -f .env
           sudo /usr/bin/docker image prune -f
 
       - name: 🔗 Get Quick Tunnel URL
