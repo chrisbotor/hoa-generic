@@ -22,7 +22,7 @@ public class AuthResource {
     @PostConstruct
     public void debugSecret() {
         System.out.println("========================================");
-        System.out.println("DEBUG: JWT_SECRET length: " + JWT_SECRET.length());
+        System.out.println("DEBUG: JWT_SECRET length: " + JWT_SECRET.length()); 
         System.out.println("========================================");
     }
 
