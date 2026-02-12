@@ -36,14 +36,15 @@ jobs:
 
       - name: 🚀 Update Containers & Sync Config
         run: |
-          # 1. Create the .env ONLY for database credentials
+          # 1. Create the .env for DB only
           echo "DB_USER=${{ secrets.DB_USER }}" > .env
           echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
           
           # 2. Identify the jar file
           JAR_NAME=$(ls target/*-runner.jar | xargs basename)
 
-          # 3. Generate docker-compose.yml with Fail-Safe Volume Mount
+          # 3. Generate docker-compose.yml 
+          # We use the volume mount to force-feed the config file
           cat << EOF > docker-compose.yml
           services:
             hoa-app:
@@ -51,14 +52,12 @@ jobs:
               container_name: hoa-quarkus-app
               volumes:
                 - ./target:/deployments:z
-                # FAIL-SAFE: Mount properties directly in case they aren't in the JAR
                 - ./src/main/resources/application.properties:/deployments/application.properties:z
               working_dir: /deployments
               environment:
                 - DB_USER=\${DB_USER}
                 - DB_PASS=\${DB_PASS}
-              # Adding -Dquarkus.config.locations points Quarkus directly to our mounted file
-              command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dquarkus.config.locations=/deployments/application.properties -jar /deployments/$JAR_NAME
+              command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dquarkus.config.locations=/deployments/application.properties -jar /deployments/\$JAR_NAME
               ports:
                 - "8081:8080"
               restart: always
@@ -82,4 +81,9 @@ jobs:
         run: |
           echo "Waiting 20 seconds for Cloudflare URL..."
           sleep 20
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*
+          # Using double quotes to avoid the shell EOF error
+          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o "https://[-a-z0-9.]*trycloudflare.com" || echo "URL not found."
+
+      - name: 🛡️ Post-Deployment Ownership Reset
+        if: always()
+        run: sudo /usr/bin/chown -R $USER:$USER .
