@@ -11,7 +11,6 @@ jobs:
 
     steps:
       - name: 🛡️ Force Cleanup Permissions
-        # Solves "EACCES: permission denied" by reclaiming ownership of target
         run: |
           if [ -d "target" ]; then
             sudo chown -R $USER:$USER target
@@ -28,29 +27,23 @@ jobs:
           distribution: 'temurin'
 
       - name: 🔨 Build Quarkus App (Uber-Jar)
-        run: ./mvnw clean package -U -DskipTests
+        run: |
+          date
+          ./mvnw clean package -U -DskipTests
 
       - name: 🛡️ Fix Build Permissions
-        # Solves "Unable to access jarfile" by ensuring Docker can read the file
-        run: sudo chmod -R 777 target/
-
-      - name: 🗑️ Clear Container Conflicts
-        # Prevents "Conflict: Container name already in use"
-        run: |
-          sudo /usr/bin/docker rm -f hoa-quarkus-app hoa-cloudflared || true
+        run: sudo chmod -R 777 target/ src/main/resources/
 
       - name: 🚀 Update Containers & Sync Config
         run: |
-          # 1. Create the .env with only the Database secrets
+          # 1. Create the .env ONLY for database credentials
           echo "DB_USER=${{ secrets.DB_USER }}" > .env
           echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
           
-          # 2. Identify the jar file (essential for the command below)
+          # 2. Identify the jar file
           JAR_NAME=$(ls target/*-runner.jar | xargs basename)
 
-          # 3. Generate docker-compose.yml 
-          # Note: We removed the Hasura environment lines here 
-          # because you have them hardcoded in application.properties
+          # 3. Generate docker-compose.yml with Fail-Safe Volume Mount
           cat << EOF > docker-compose.yml
           services:
             hoa-app:
@@ -58,13 +51,14 @@ jobs:
               container_name: hoa-quarkus-app
               volumes:
                 - ./target:/deployments:z
+                # FAIL-SAFE: Mount properties directly in case they aren't in the JAR
+                - ./src/main/resources/application.properties:/deployments/application.properties:z
               working_dir: /deployments
               environment:
                 - DB_USER=\${DB_USER}
                 - DB_PASS=\${DB_PASS}
-                # We removed HASURA and JWT_SECRET from here 
-                # because they are now hardcoded in your files for reliability
-              command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar /deployments/$JAR_NAME
+              # Adding -Dquarkus.config.locations points Quarkus directly to our mounted file
+              command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dquarkus.config.locations=/deployments/application.properties -jar /deployments/$JAR_NAME
               ports:
                 - "8081:8080"
               restart: always
@@ -72,14 +66,15 @@ jobs:
             hoa-tunnel:
               image: cloudflare/cloudflared:latest
               container_name: hoa-cloudflared
-              command: tunnel --url http://hoa-quarkus-app:8080
+              command: tunnel --url http://hoa-app:8080
               restart: always
           EOF
 
-          # 4. Deploy using fresh config
+          # 4. Nuclear Refresh
+          sudo /usr/bin/docker compose down -v
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
-          # 5. Cleanup temporary storage
+          # 5. Cleanup
           rm .env
           sudo /usr/bin/docker image prune -f
 
@@ -87,11 +82,4 @@ jobs:
         run: |
           echo "Waiting 20 seconds for Cloudflare URL..."
           sleep 20
-          echo "------------------------------------------------"
-          echo "ACCESS YOUR PORTAL AT THE LINK BELOW:"
-          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*trycloudflare.com' || echo "URL not found yet. Check logs manually."
-          echo "------------------------------------------------"
-
-      - name: 🛡️ Post-Deployment Ownership Reset
-        if: always()
-        run: sudo /usr/bin/chown -R $USER:$USER .
+          sudo /usr/bin/docker logs hoa-cloudflared 2>&1 | grep -o 'https://[-a-z0-9.]*
