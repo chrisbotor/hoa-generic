@@ -40,11 +40,7 @@ jobs:
           echo "DB_USER=${{ secrets.DB_USER }}" > .env
           echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
           
-          # 2. Identify the jar file
-          JAR_NAME=$(ls target/*-runner.jar | xargs basename)
-
-          # 3. Generate docker-compose.yml 
-          # We use the volume mount to force-feed the config file
+          # 2. Generate docker-compose.yml 
           cat << EOF > docker-compose.yml
           services:
             hoa-app:
@@ -57,7 +53,8 @@ jobs:
               environment:
                 - DB_USER=\${DB_USER}
                 - DB_PASS=\${DB_PASS}
-              command: java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dquarkus.config.locations=/deployments/application.properties -jar /deployments/\$JAR_NAME
+              # Using sh -c to allow the wildcard to resolve the JAR name
+              command: sh -c "java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dquarkus.config.locations=/deployments/application.properties -jar /deployments/*-runner.jar"
               ports:
                 - "8081:8080"
               restart: always
@@ -69,10 +66,13 @@ jobs:
               restart: always
           EOF
 
-          # 4. Nuclear Refresh
+          # 3. Nuclear Refresh
           sudo /usr/bin/docker compose down -v
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
+          # 4. Cleanup
+          rm .env
+
           # 5. Cleanup
           rm .env
           sudo /usr/bin/docker image prune -f
