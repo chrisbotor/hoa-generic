@@ -3,7 +3,7 @@ package com.hoa.portal.resource;
 import com.hoa.portal.entity.User;
 import io.quarkus.elytron.security.common.BcryptUtil;
 import io.smallrye.jwt.build.Jwt;
-import io.smallrye.jwt.algorithm.SignatureAlgorithm; // Added this
+import io.smallrye.jwt.algorithm.SignatureAlgorithm;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -20,6 +20,7 @@ import java.util.Map;
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
+    // Exactly 32 characters
     private static final String JWT_SECRET = "BeelinkSer5ProHOAKeyStatic202626";
 
     @POST
@@ -28,7 +29,7 @@ public class AuthResource {
     public Response login(LoginRequest request) {
         User user = User.find("email", request.email).firstResult();
 
-        // Ensure you use the correct field name (password or passwordHash)
+        // Note: verify if your User entity uses .password or .passwordHash
         if (user == null || !BcryptUtil.matches(request.passwordHash, user.passwordHash)) {
             return Response.status(Response.Status.UNAUTHORIZED).build();
         }
@@ -37,6 +38,7 @@ public class AuthResource {
         roles.add(user.role);
 
         try {
+            // Convert secret string to byte array
             byte[] keyBytes = JWT_SECRET.getBytes(StandardCharsets.UTF_8);
             SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "HmacSHA256");
 
@@ -51,13 +53,13 @@ public class AuthResource {
                             "x-hasura-user-id", user.id.toString()
                     ))
                     .jws()
-                    .algorithm(SignatureAlgorithm.HS256) // FORCED ALGORITHM
-                    .sign(secretKey);
+                    .algorithm(SignatureAlgorithm.HS256) // Forces HS256 in the Header
+                    .sign(secretKey); // Signs with the specific Key object
 
             return Response.ok(Map.of("token", token)).build();
 
         } catch (Exception e) {
-            return Response.serverError().entity("Error: " + e.getMessage()).build();
+            return Response.serverError().entity("Token Error: " + e.getMessage()).build();
         }
     }
 
