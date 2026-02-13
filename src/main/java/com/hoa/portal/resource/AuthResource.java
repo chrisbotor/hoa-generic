@@ -17,7 +17,7 @@ import java.util.Arrays;
 public class AuthResource {
 
     // Hardcoded for absolute synchronization with application.properties
-    private static final String JWT_SECRET = "BeelinkSer5ProHOAKey_Static2026!";
+    private static final String JWT_SECRET = "BeelinkSer5ProHOAKeyStatic20262";
 
     @PostConstruct
     public void debugSecret() {
