@@ -37,7 +37,7 @@ jobs:
           echo "DB_USER=${{ secrets.DB_USER }}" > .env
           echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
           
-          # 2. Create the properties file
+          # 2. Force create the resources directory and properties file
           mkdir -p src/main/resources/
           cat << 'EOF' > src/main/resources/application.properties
           quarkus.http.root-path=/portal
@@ -50,13 +50,13 @@ jobs:
           quarkus.datasource.username=${DB_USER}
           quarkus.datasource.password=${DB_PASS}
 
-          # Logging
+          # Logging (Trace level for JWT to catch the exact rejection reason)
           quarkus.log.level=INFO
           quarkus.log.category."io.smallrye.jwt".level=TRACE
           quarkus.log.category."io.quarkus.security".level=DEBUG
           EOF
 
-          # 3. Generate docker-compose.yml with CRITICAL JWT FIXES
+          # 3. Generate docker-compose.yml with TRIPLE-LOCK JWT FIXES
           cat << 'EOF' > docker-compose.yml
           services:
             hoa-app:
@@ -69,13 +69,14 @@ jobs:
               environment:
                 - DB_USER=${DB_USER}
                 - DB_PASS=${DB_PASS}
-                # FORCED JWT OVERRIDES: Base64 is safer for environment variables
+                # --- JWT SECURITY CONFIGURATION ---
+                # Base64 for: BeelinkSer5ProHOAKeyStatic202626
                 - SMALLRYE_JWT_VERIFY_KEY=QmVlbGlua1NlcjVQcm9IT0FLZXlTdGF0aWMyMDI2MjY=
                 - SMALLRYE_JWT_VERIFY_KEY_FORMAT=BASE64
                 - SMALLRYE_JWT_VERIFY_KEY_ALGORITHM=HS256
                 - MP_JWT_VERIFY_ISSUER=https://hoa-portal.com
                 - SMALLRYE_JWT_PATH_GROUPS=groups
-              # Force config location to ensure volume mount is prioritized
+              # Forces the app to prioritize the external application.properties
               command: sh -c "java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dquarkus.config.locations=/deployments/application.properties -jar /deployments/*-runner.jar"
               ports:
                 - "8081:8080"
