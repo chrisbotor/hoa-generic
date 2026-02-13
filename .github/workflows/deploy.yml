@@ -31,52 +31,32 @@ jobs:
           date
           ./mvnw clean package -U -DskipTests
 
-      - name: 🛡️ Fix Build Permissions
-        run: sudo chmod -R 777 target/
-
       - name: 🚀 Update Containers & Sync Config
         run: |
           # 1. Create the .env for DB only
           echo "DB_USER=${{ secrets.DB_USER }}" > .env
           echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
           
-          # 2. Force create the resources directory
+          # 2. Force create the resources directory and properties file
           mkdir -p src/main/resources/
-          
-          # 3. FORCE REWRITE application.properties
-          # The 'EOF' ensures the key is written exactly as typed
           cat << 'EOF' > src/main/resources/application.properties
           quarkus.http.root-path=/portal
           quarkus.http.cors.enabled=true
           quarkus.http.cors.origins=*
-          
-          # JWT Security Settings
-          mp.jwt.verify.issuer=https://hoa-portal.com
-          smallrye.jwt.path.groups=groups
-          mp.jwt.verify.upn-claim=upn
-          smallrye.jwt.verify.algorithm=HS256
-          smallrye.jwt.verify.key.format=RAW
-          smallrye.jwt.verify.key=BeelinkSer5ProHOAKeyStatic202626
-          smallrye.jwt.verify.clock-skew=3600
-          
-          # Logging (DEBUG level helps catch 401 reasons)
-          quarkus.log.level=INFO
-          quarkus.log.category."io.smallrye.jwt".level=TRACE
-          quarkus.log.category."io.quarkus.security".level=DEBUG
           
           # Database Configuration
           quarkus.datasource.db-kind=postgresql
           quarkus.datasource.jdbc.url=jdbc:postgresql://192.168.100.80:5432/hoa_db
           quarkus.datasource.username=${DB_USER}
           quarkus.datasource.password=${DB_PASS}
+
+          # Logging
+          quarkus.log.level=INFO
+          quarkus.log.category."io.smallrye.jwt".level=TRACE
+          quarkus.log.category."io.quarkus.security".level=DEBUG
           EOF
 
-          # 4. Debug Verification: Proof in the Action Logs
-          echo "--- VERIFYING FILE CREATION ---"
-          ls -l src/main/resources/application.properties
-          grep "smallrye.jwt.verify.key" src/main/resources/application.properties
-
-          # 5. Generate docker-compose.yml 
+          # 3. Generate docker-compose.yml with FORCED JWT OVERRIDES
           cat << 'EOF' > docker-compose.yml
           services:
             hoa-app:
@@ -89,7 +69,12 @@ jobs:
               environment:
                 - DB_USER=${DB_USER}
                 - DB_PASS=${DB_PASS}
-              command: sh -c "java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dquarkus.config.locations=/deployments/application.properties -jar /deployments/*-runner.jar"
+                # --- JWT HIGH PRIORITY OVERRIDES ---
+                - SMALLRYE_JWT_VERIFY_KEY=BeelinkSer5ProHOAKeyStatic202626
+                - SMALLRYE_JWT_VERIFY_KEY_FORMAT=RAW
+                - MP_JWT_VERIFY_ISSUER=https://hoa-portal.com
+                - SMALLRYE_JWT_PATH_GROUPS=groups
+              command: sh -c "java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -jar /deployments/*-runner.jar"
               ports:
                 - "8081:8080"
               restart: always
@@ -101,11 +86,11 @@ jobs:
               restart: always
           EOF
 
-          # 6. Nuclear Refresh
+          # 4. Nuclear Refresh
           sudo /usr/bin/docker compose down -v
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
-          # 7. Cleanup
+          # 5. Cleanup
           rm -f .env
           sudo /usr/bin/docker image prune -f
 
