@@ -30,7 +30,7 @@ public class AuthResource {
         User user = User.find("email", request.email).firstResult();
 
         // 2. Validate password and existence
-        if (user == null || !BcryptUtil.matches(request.passwordHash, user.password)) {
+        if (user == null || !BcryptUtil.matches(request.passwordHash, user.passwordHash)) {
             return Response.status(Response.Status.UNAUTHORIZED).build();
         }
 
