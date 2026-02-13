@@ -49,6 +49,7 @@ public class AuthResource {
                     .upn(user.email)
                     .subject(user.email)
                     .groups(roles)
+                    .expiresIn(28800)
                     .claim("https://hasura.io/jwt/claims", Map.of(
                             "x-hasura-allowed-roles", roles,
                             "x-hasura-default-role", user.role,
