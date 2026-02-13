@@ -50,7 +50,7 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800) 
-                .sign(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+                .signWithSecret(JWT_SECRET);
             return Response.ok(Map.of("token", token)).build();
         }
         
