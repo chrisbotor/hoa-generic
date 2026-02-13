@@ -32,7 +32,7 @@ jobs:
           ./mvnw clean package -U -DskipTests
 
       - name: 🛡️ Fix Build Permissions
-        run: sudo chmod -R 777 target/ src/main/resources/
+        run: sudo chmod -R 777 target/
 
       - name: 🚀 Update Containers & Sync Config
         run: |
@@ -40,9 +40,12 @@ jobs:
           echo "DB_USER=${{ secrets.DB_USER }}" > .env
           echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
           
-          # 2. FORCE REWRITE application.properties
-          # This guarantees the 'Bouncer' and 'Key Maker' use the same 32-char key
-          cat << EOF > src/main/resources/application.properties
+          # 2. Force create the resources directory
+          mkdir -p src/main/resources/
+          
+          # 3. FORCE REWRITE application.properties
+          # The 'EOF' ensures the key is written exactly as typed
+          cat << 'EOF' > src/main/resources/application.properties
           quarkus.http.root-path=/portal
           quarkus.http.cors.enabled=true
           quarkus.http.cors.origins=*
@@ -56,7 +59,7 @@ jobs:
           smallrye.jwt.verify.key=BeelinkSer5ProHOAKeyStatic202626
           smallrye.jwt.verify.clock-skew=3600
           
-          # Logging (TRACE helps debug the 401)
+          # Logging (DEBUG level helps catch 401 reasons)
           quarkus.log.level=INFO
           quarkus.log.category."io.smallrye.jwt".level=TRACE
           quarkus.log.category."io.quarkus.security".level=DEBUG
@@ -64,12 +67,17 @@ jobs:
           # Database Configuration
           quarkus.datasource.db-kind=postgresql
           quarkus.datasource.jdbc.url=jdbc:postgresql://192.168.100.80:5432/hoa_db
-          quarkus.datasource.username=\${DB_USER}
-          quarkus.datasource.password=\${DB_PASS}
+          quarkus.datasource.username=${DB_USER}
+          quarkus.datasource.password=${DB_PASS}
           EOF
 
-          # 3. Generate docker-compose.yml
-          cat << EOF > docker-compose.yml
+          # 4. Debug Verification: Proof in the Action Logs
+          echo "--- VERIFYING FILE CREATION ---"
+          ls -l src/main/resources/application.properties
+          grep "smallrye.jwt.verify.key" src/main/resources/application.properties
+
+          # 5. Generate docker-compose.yml 
+          cat << 'EOF' > docker-compose.yml
           services:
             hoa-app:
               image: eclipse-temurin:21-jre-jammy
@@ -79,8 +87,8 @@ jobs:
                 - ./src/main/resources/application.properties:/deployments/application.properties:z
               working_dir: /deployments
               environment:
-                - DB_USER=\${DB_USER}
-                - DB_PASS=\${DB_PASS}
+                - DB_USER=${DB_USER}
+                - DB_PASS=${DB_PASS}
               command: sh -c "java -Djava.util.logging.manager=org.jboss.logmanager.LogManager -Dquarkus.config.locations=/deployments/application.properties -jar /deployments/*-runner.jar"
               ports:
                 - "8081:8080"
@@ -93,11 +101,11 @@ jobs:
               restart: always
           EOF
 
-          # 4. Nuclear Refresh (Deletes volumes and orphans)
+          # 6. Nuclear Refresh
           sudo /usr/bin/docker compose down -v
           sudo /usr/bin/docker compose up -d --build --force-recreate --remove-orphans
           
-          # 5. Cleanup
+          # 7. Cleanup
           rm -f .env
           sudo /usr/bin/docker image prune -f
 
