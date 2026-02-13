@@ -6,60 +6,65 @@ import io.smallrye.jwt.build.Jwt;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.annotation.PostConstruct;
-import java.util.HashSet;
-import java.util.Map;
+import jakarta.annotation.security.PermitAll;
+
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-
-
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Map;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class AuthResource {
 
-    // Hardcoded for absolute synchronization with application.properties
+    // Must be exactly 32 characters to match your deployment environment
     private static final String JWT_SECRET = "BeelinkSer5ProHOAKeyStatic202626";
-
-    @PostConstruct
-    public void debugSecret() {
-        System.out.println("========================================");
-        System.out.println("DEBUG: SECRET_VALUE = [" + JWT_SECRET + "]");
-        System.out.println("DEBUG: JWT_SECRET length: " + JWT_SECRET.length()); 
-        System.out.println("========================================");
-    }
 
     @POST
     @Path("/login")
-    public Response login(LoginRequest loginRequest) {
+    @PermitAll
+    public Response login(LoginRequest request) {
         // 1. Find the user
-        User user = User.find("email", loginRequest.email).firstResult();
+        User user = User.find("email", request.email).firstResult();
 
-        // 2. Bcrypt Check: matches(PlainTextFromUser, HashFromDatabase)
-        if (user != null && BcryptUtil.matches(loginRequest.passwordHash, user.passwordHash)) {
-            
-            // 3. Generate Token
-            String token = Jwt.issuer("https://hoa-portal.com")
-                .upn(user.email)    
-                .subject(user.email)
-                .groups(new HashSet<>(Arrays.asList(user.role)))
-                .claim("https://hasura.io/jwt/claims", Map.of(
-                    "x-hasura-allowed-roles", Arrays.asList(user.role),
-                    "x-hasura-default-role", user.role,
-                    "x-hasura-user-id", user.id.toString()
-                ))
-                .expiresIn(28800) 
-                .signWithSecret(JWT_SECRET);
-            return Response.ok(Map.of("token", token)).build();
+        // 2. Validate password and existence
+        if (user == null || !BcryptUtil.matches(request.passwordHash, user.password)) {
+            return Response.status(Response.Status.UNAUTHORIZED).build();
         }
-        
-        // Fail if no match
-        return Response.status(Response.Status.UNAUTHORIZED).build();
+
+        // 3. Prepare roles
+        Set<String> roles = new HashSet<>();
+        roles.add(user.role); // e.g., "resident" or "admin"
+
+        try {
+            // 4. Create the SecretKeySpec (The "Key Maker")
+            // This ensures we use UTF-8 bytes specifically
+            byte[] keyBytes = JWT_SECRET.getBytes(StandardCharsets.UTF_8);
+            SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "HmacSHA256");
+
+            // 5. Build and Sign the Token
+            String token = Jwt.issuer("https://hoa-portal.com")
+                    .upn(user.email)
+                    .subject(user.email)
+                    .groups(roles)
+                    .claim("https://hasura.io/jwt/claims", Map.of(
+                            "x-hasura-allowed-roles", roles,
+                            "x-hasura-default-role", user.role,
+                            "x-hasura-user-id", user.id.toString()
+                    ))
+                    .sign(secretKey); // Uses the explicit Key object
+
+            return Response.ok(Map.of("token", token)).build();
+
+        } catch (Exception e) {
+            return Response.serverError().entity("Error generating token: " + e.getMessage()).build();
+        }
     }
 
     public static class LoginRequest {
         public String email;
-        public String passwordHash; // This will receive the plain text "password123"
+        public String passwordHash; 
     }
 }
