@@ -12,6 +12,8 @@ import java.util.Map;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
+
+
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -48,8 +50,7 @@ public class AuthResource {
                     "x-hasura-user-id", user.id.toString()
                 ))
                 .expiresIn(28800) 
-                .signWithSecret(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
-
+                .sign(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
             return Response.ok(Map.of("token", token)).build();
         }
         
